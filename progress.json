@@ -1,0 +1,32 @@
+{
+    "Data Preprocessing": {
+        "Public Data": {
+            "attempts": 2,
+            "correct": 2,
+            "incorrect": 0,
+            "history": []
+        },
+        "Data Cleaning": {
+            "attempts": 7,
+            "correct": 3,
+            "incorrect": 4,
+            "history": [
+                {
+                    "question": "What is one reason why data needs to be cleaned before it is analyzed?",
+                    "student_answer": "So our analysis gives correct and useful result",
+                    "correct": true
+                },
+                {
+                    "question": "In data cleaning, what should you do when you encounter placeholder strings like 'NA', 'XX', or '999' that represent missing data but are not automatically recognized as such by your software?",
+                    "student_answer": "Replace them with NULL or common value",
+                    "correct": true
+                },
+                {
+                    "question": "According to the checklist for fixing rows, what action should you take when you find summary rows such as 'Total' or 'Subtotal' in your dataset?",
+                    "student_answer": "Dont know",
+                    "correct": false
+                }
+            ]
+        }
+    }
+}
