@@ -1,4 +1,27 @@
+# Python
 venv/
-.env
-chroma_db/
+.venv/
 __pycache__/
+*.py[cod]
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Firebase
+firebase-service-account.json
+
+# ChromaDB
+chroma_db/
+
+# Uploaded files
+data/uploads/
+
+# Node / React
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/

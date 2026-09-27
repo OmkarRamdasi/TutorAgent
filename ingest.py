@@ -1,6 +1,7 @@
-import os 
+import os
 import pymupdf
 import chromadb
+import uuid
 
 from dotenv import load_dotenv
 from google import genai
@@ -9,9 +10,9 @@ from google import genai
 # -----------------------------
 # Configuration
 # -----------------------------
-PDF_PATH = "D:/DataScience/TutorAgent/data/DataPreprocessing.pdf"
 CHUNK_SIZE = 700
 CHUNK_OVERLAP = 100
+
 
 # -----------------------------
 # Gemini
@@ -21,6 +22,7 @@ load_dotenv()
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )
+
 
 # -----------------------------
 # ChromaDB
@@ -33,20 +35,27 @@ collection = chroma_client.get_or_create_collection(
     name="data_science_course"
 )
 
+
 # -----------------------------
 # Extract PDF text
 # -----------------------------
 def extract_text(pdf_path):
+
     document = pymupdf.open(pdf_path)
+
     pages = []
+
     for page_number, page in enumerate(document):
+
         text = page.get_text()
 
         pages.append({
             "page_number": page_number + 1,
             "text": text
         })
+
     document.close()
+
     return pages
 
 
@@ -54,9 +63,11 @@ def extract_text(pdf_path):
 # Create chunks
 # -----------------------------
 def create_chunks(pages):
+
     chunks = []
 
     for page in pages:
+
         words = page["text"].split()
 
         start = 0
@@ -82,7 +93,6 @@ def create_chunks(pages):
 # -----------------------------
 # Generate embedding
 # -----------------------------
-
 def create_embedding(text):
 
     result = client.models.embed_content(
@@ -92,34 +102,52 @@ def create_embedding(text):
 
     return result.embeddings[0].values
 
+
 # -----------------------------
-# Main
+# Ingest PDF
 # -----------------------------
+def ingest_pdf(pdf_path):
 
-pages = extract_text(PDF_PATH)
+    print(f"\nIngesting: {pdf_path}")
 
-chunks = create_chunks(pages)
+    # Extract text
+    pages = extract_text(pdf_path)
 
-print("Pages:", len(pages))
-print("Chunks:", len(chunks))
+    print("Pages:", len(pages))
 
+    # Create chunks
+    chunks = create_chunks(pages)
 
-for index, chunk in enumerate(chunks):
+    print("Chunks:", len(chunks))
 
-    embedding = create_embedding(chunk["text"])
+    # Store embeddings
+    for index, chunk in enumerate(chunks):
 
-    collection.add(
-        ids=[f"chunk_{index}"],
-        documents=[chunk["text"]],
-        embeddings=[embedding],
-        metadatas=[{
-            "page": chunk["page_number"],
-            "source": PDF_PATH
-        }]
+        embedding = create_embedding(chunk["text"])
+
+        collection.add(
+            ids=[str(uuid.uuid4())],
+            documents=[chunk["text"]],
+            embeddings=[embedding],
+            metadatas=[{
+                "page": chunk["page_number"],
+                "source": pdf_path
+            }]
+        )
+
+        print(
+            f"Stored chunk {index + 1}/{len(chunks)}"
+        )
+
+    print("\nFinished!")
+
+    print(
+        "Documents in ChromaDB:",
+        collection.count()
     )
 
-    print(f"Stored chunk {index + 1}/{len(chunks)}")
-
-
-print("\nFinished!")
-print("Documents in ChromaDB:", collection.count())
+    return {
+        "pages": len(pages),
+        "chunks": len(chunks),
+        "total_documents": collection.count()
+    }
