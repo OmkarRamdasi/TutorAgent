@@ -22,6 +22,14 @@ function App() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
+  const [question, setQuestion] = useState("");
+
+  const [tutorResponse, setTutorResponse] =
+    useState<any>(null);
+
+  const [askingTutor, setAskingTutor] =
+    useState(false);
+
   const [courses, setCourses] = useState<any[]>([]);
 
   const [darkMode, setDarkMode] = useState(() => {
@@ -199,6 +207,82 @@ function App() {
     }
   };
 
+  const askTutor = async (
+    question: string,
+    courseId: string
+  ) => {
+    if (!user) {
+      throw new Error("Please log in first.");
+    }
+
+    const token = await user.getIdToken();
+
+    const response = await fetch(
+      "http://localhost:8000/ask",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          question,
+          course_id: courseId,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail || "Tutor request failed."
+      );
+    }
+
+    return data;
+  };
+
+  const handleAskTutor = async () => {
+    if (!question.trim()) {
+      return;
+    }
+
+    if (!user) {
+      alert("Please log in first.");
+      return;
+    }
+
+    if (courses.length === 0) {
+      alert("Please upload a course first.");
+      return;
+    }
+
+    setAskingTutor(true);
+
+    try {
+      const courseId = courses[0].id;
+
+      const result = await askTutor(
+        question,
+        courseId
+      );
+
+      setTutorResponse(result);
+
+    } catch (error) {
+      console.error(error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Tutor failed."
+      );
+
+    } finally {
+      setAskingTutor(false);
+    }
+  };
   const fetchCourses = async (currentUser: User) => {
     try {
       const token = await currentUser.getIdToken();
@@ -300,6 +384,23 @@ function App() {
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white"
               >
                 Test Courses
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const result = await askTutor(
+                      "What is data preprocessing?",
+                      "1c789616-f5c9-4bbe-93eb-ced3361f8919"
+                    );
+
+                    console.log("TUTOR RESPONSE:", result);
+
+                  } catch (error) {
+                    console.error(error);
+                  }
+                }}
+              >
+                Test Tutor
               </button>
               <button
                 onClick={handleLogout}
@@ -542,6 +643,88 @@ function App() {
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* ASK TUTOR */}
+              <div
+                className={`mt-8 rounded-2xl border p-6 transition ${
+                  darkMode
+                    ? "border-white/10 bg-white/[0.02]"
+                    : "border-zinc-200 bg-white"
+                }`}
+              >
+
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  🤖 LearnAI Tutor
+                </h2>
+
+                <p className="mt-2 text-gray-500 dark:text-gray-400">
+                  Ask me anything about your course material.
+                </p>
+
+                <div className="mt-5 flex gap-3">
+
+                  <input
+                    type="text"
+                    value={question}
+                    onChange={(e) =>
+                      setQuestion(e.target.value)
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleAskTutor();
+                      }
+                    }}
+                    placeholder="What do you want to learn?"
+                    className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                  />
+
+                  <button
+                    onClick={handleAskTutor}
+                    disabled={askingTutor}
+                    className="rounded-xl bg-indigo-600 px-6 py-3 font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {askingTutor ? "Thinking..." : "Ask Tutor"}
+                  </button>
+
+                </div>
+
+                {tutorResponse && (
+                  <div className="mt-8">
+
+                    <div className="mb-2 text-sm font-medium text-indigo-400">
+                      {tutorResponse.topic}
+                    </div>
+
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {tutorResponse.concept}
+                    </h3>
+
+                    <div className="mt-4 whitespace-pre-line leading-7 text-gray-700 dark:text-gray-300">
+                      {tutorResponse.lesson}
+                    </div>
+
+                    <div
+                      className={`mt-8 rounded-xl p-5 ${
+                        darkMode
+                          ? "bg-white/[0.05]"
+                          : "bg-zinc-50"
+                      }`}
+                    >
+
+                      <h4 className="font-bold text-gray-900 dark:text-white">
+                        📝 Quick Check
+                      </h4>
+
+                      <p className="mt-3 text-gray-700 dark:text-gray-300">
+                        {tutorResponse.quiz_question}
+                      </p>
+
+                    </div>
+
+                  </div>
+                )}
+
               </div>
 
               {/* LIBRARY */}

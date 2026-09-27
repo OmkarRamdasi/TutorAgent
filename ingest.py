@@ -106,7 +106,9 @@ def create_embedding(text):
 # -----------------------------
 # Ingest PDF
 # -----------------------------
-def ingest_pdf(pdf_path):
+def ingest_pdf(pdf_path,user_id,
+    course_id,
+    document_id):
 
     print(f"\nIngesting: {pdf_path}")
 
@@ -124,12 +126,22 @@ def ingest_pdf(pdf_path):
     for index, chunk in enumerate(chunks):
 
         embedding = create_embedding(chunk["text"])
-
+        print("\nCHROMA DEBUG")
+        print({
+            "user_id": user_id,
+            "course_id": course_id,
+            "document_id": document_id,
+            "page": chunk["page_number"],
+            "source": pdf_path
+        })
         collection.add(
             ids=[str(uuid.uuid4())],
             documents=[chunk["text"]],
             embeddings=[embedding],
             metadatas=[{
+                "user_id": user_id,
+                "course_id": course_id,
+                "document_id": document_id,
                 "page": chunk["page_number"],
                 "source": pdf_path
             }]

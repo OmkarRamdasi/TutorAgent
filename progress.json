@@ -27,6 +27,18 @@
                     "correct": false
                 }
             ]
+        },
+        "Data Preprocessing": {
+            "attempts": 1,
+            "correct": 0,
+            "incorrect": 1,
+            "history": [
+                {
+                    "question": "Why do quality issues in data need to be corrected before the data is analysed?",
+                    "student_answer": "helps clean up or remove that invalid value before you start your analysis.",
+                    "correct": false
+                }
+            ]
         }
     }
 }

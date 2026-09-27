@@ -30,40 +30,39 @@ collection = chroma_client.get_collection(
 
 
 # -----------------------------
-# Create query embedding
+# Create embedding
 # -----------------------------
 
-question = "What is data preprocessing?"
+def create_embedding(text):
 
-result = client.models.embed_content(
-    model="gemini-embedding-2",
-    contents=question
-)
+    result = client.models.embed_content(
+        model="gemini-embedding-2",
+        contents=text
+    )
 
-question_embedding = result.embeddings[0].values
-
-
-# -----------------------------
-# Search ChromaDB
-# -----------------------------
-
-results = collection.query(
-    query_embeddings=[question_embedding],
-    n_results=2
-)
+    return result.embeddings[0].values
 
 
 # -----------------------------
-# Display results
+# Retrieve relevant chunks
 # -----------------------------
 
-print("\nQUESTION:")
-print(question)
+def retrieve_chunks(
+    question,
+    course_id,
+    top_k=3
+):
 
-print("\nRETRIEVED CHUNKS:\n")
+    question_embedding = create_embedding(
+        question
+    )
 
-for i, document in enumerate(results["documents"][0]):
+    results = collection.query(
+        query_embeddings=[question_embedding],
+        n_results=top_k,
+        where={
+            "course_id": course_id
+        }
+    )
 
-    print(f"--- Result {i + 1} ---")
-    print(document)
-    print()
+    return results

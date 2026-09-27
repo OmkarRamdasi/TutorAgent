@@ -504,12 +504,15 @@ def record_progress(
 
 def retrieve(
     question,
+    course_id,
     number_of_chunks=2
 ):
     """
     Convert the student's question into an embedding
     and retrieve the most relevant course material
     from ChromaDB.
+
+    Retrieval is restricted to the selected course.
     """
 
     result = client.models.embed_content(
@@ -523,7 +526,10 @@ def retrieve(
         query_embeddings=[
             question_embedding
         ],
-        n_results=number_of_chunks
+        n_results=number_of_chunks,
+        where={
+            "course_id": course_id
+        }
     )
 
     return results["documents"][0]
@@ -1106,7 +1112,10 @@ EVALUATION RULES
 # 7. PRACTICE
 # ============================================================
 
-def practice(concept):
+def practice(
+    concept,
+    course_id
+):
     """
     Practice a specific Data Science concept.
     """
@@ -1116,7 +1125,8 @@ def practice(concept):
     # --------------------------------------------------------
 
     retrieved_chunks = retrieve(
-        concept
+        concept,
+        course_id
     )
 
     # --------------------------------------------------------
@@ -1359,7 +1369,10 @@ Rules:
 # 8. TEACH
 # ============================================================
 
-def teach(question):
+def teach(
+    question,
+    course_id
+):
     """
     Complete RAG tutoring pipeline.
     """
@@ -1369,7 +1382,8 @@ def teach(question):
     # --------------------------------------------------------
 
     retrieved_chunks = retrieve(
-        question
+        question,
+        course_id
     )
 
     # --------------------------------------------------------
@@ -1552,7 +1566,10 @@ def teach(question):
 # 9. AGENT
 # ============================================================
 
-def agent(question):
+def agent(
+    question,
+    course_id
+):
     """
     Main Agentic AI entry point.
 
@@ -1589,7 +1606,10 @@ def agent(question):
 
     if intent == "teach":
 
-        teach(question)
+        teach(
+            question,
+            course_id
+        )
 
     # --------------------------------------------------------
     # PRACTICE
@@ -1607,7 +1627,8 @@ def agent(question):
             return
 
         practice(
-            concept
+            concept,
+            course_id
         )
 
     # --------------------------------------------------------
@@ -1624,6 +1645,74 @@ def agent(question):
             "\nI couldn't determine what you want to do."
         )
 
+# ============================================================
+# Ask API
+# ============================================================
+def ask_tutor(
+    question,
+    course_id
+):
+    """
+    API-friendly tutor function.
+
+    Retrieves course material, identifies the concept,
+    reads student memory, calculates mastery, and
+    generates a lesson + quiz.
+
+    Does not use input() or print() for interaction.
+    """
+
+    # 1. Retrieve course material
+    retrieved_chunks = retrieve(
+        question,
+        course_id,
+        number_of_chunks=3
+    )
+
+    # 2. Identify topic + concept
+    concept_identification = identify_concept(
+        question,
+        retrieved_chunks
+    )
+
+    if concept_identification is None:
+        raise RuntimeError(
+            "Could not identify the concept."
+        )
+
+    # 3. Read student memory
+    concept_history = get_concept_history(
+        concept_identification.topic,
+        concept_identification.concept
+    )
+
+    # 4. Calculate mastery
+    mastery = calculate_mastery(
+        concept_identification.topic,
+        concept_identification.concept
+    )
+
+    # 5. Determine learning state
+    learning_state = get_learning_state(
+        mastery
+    )
+
+    # 6. Generate lesson + quiz
+    tutor = generate_tutor_response(
+        question,
+        retrieved_chunks,
+        concept_identification,
+        concept_history,
+        mastery,
+        learning_state
+    )
+
+    if tutor is None:
+        raise RuntimeError(
+            "Could not generate tutor response."
+        )
+
+    return tutor
 
 # ============================================================
 # MAIN PROGRAM
@@ -1635,4 +1724,11 @@ if __name__ == "__main__":
         "\nAsk your Data Science Tutor: "
     )
 
-    agent(question)
+    course_id = input(
+        "\nEnter course ID: "
+    )
+
+    agent(
+        question,
+        course_id
+    )

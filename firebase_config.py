@@ -1,18 +1,10 @@
-import firebase_config
+import firebase_admin
+from firebase_admin import credentials, auth
 
-from firebase_config import credentials, auth
+cred = credentials.Certificate("firebase-service-account.json")
 
-
-# Initialize Firebase Admin SDK
-cred = credentials.Certificate(
-    "firebase-service-account.json"
-)
-
-firebase_config.initialize_app(cred)
+firebase_admin.initialize_app(cred)
 
 
 def verify_token(id_token: str):
-
-    decoded_token = auth.verify_id_token(id_token)
-
-    return decoded_token
+    return auth.verify_id_token(id_token)

@@ -7,20 +7,27 @@ from fastapi import (
     HTTPException,
 )
 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from pathlib import Path
 import shutil
 import uuid
 
 from ingest import ingest_pdf
+from ask import ask_tutor
 from firebase_config import verify_token
 from database import SessionLocal
 from models import User, Course, Document
 
 
 app = FastAPI()
+security = HTTPBearer()
 
+class AskRequest(BaseModel):
+    question: str
+    course_id: str
 
 # -----------------------------
 # CORS
@@ -51,33 +58,16 @@ UPLOAD_DIR.mkdir(
 # -----------------------------
 
 def get_current_user(
-    authorization: str = Header(...)
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-
-    if not authorization.startswith("Bearer "):
-
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid authorization header"
-        )
-
-    token = authorization.split(
-        "Bearer ",
-        1
-    )[1]
+    token = credentials.credentials
 
     try:
-
         decoded_token = verify_token(token)
-
         return decoded_token
 
     except Exception as e:
-
-        print(
-            "Firebase token verification failed:",
-            e
-        )
+        print("Firebase token verification failed:", e)
 
         raise HTTPException(
             status_code=401,
@@ -260,8 +250,12 @@ async def upload_pdf(
             db.close()
 
     # 3. Process PDF / create embeddings
+    print("\nUPLOAD DEBUG")
+    print("user_id:", user.id)
+    print("course_id:", course_id)
+    print("document_id:", document_id)
     try:
-        result = ingest_pdf(str(file_path))
+        result = ingest_pdf(str(file_path),user.id, course_id, document_id)
 
     except Exception as e:
         # Processing failed
@@ -322,49 +316,61 @@ async def upload_pdf(
         "status": "ready"
     }
     
-
-# -----------------------------
-# Get Courses
-# -----------------------------    
-@app.get("/courses")
-def get_courses(current_user=Depends(get_current_user)):
+    
+    
+@app.post("/ask")
+def ask_tutor_endpoint(
+    request: AskRequest,
+    current_user=Depends(get_current_user)
+):
     user = get_or_create_user(current_user)
 
+    # Verify that this course belongs to the logged-in user
     db = SessionLocal()
 
     try:
-        courses = (
+        course = (
             db.query(Course)
-            .filter(Course.user_id == user.id)
-            .order_by(Course.created_at.desc())
-            .all()
+            .filter(
+                Course.id == request.course_id,
+                Course.user_id == user.id
+            )
+            .first()
         )
 
-        result = []
-
-        for course in courses:
-            documents = (
-                db.query(Document)
-                .filter(Document.course_id == course.id)
-                .all()
+        if not course:
+            raise HTTPException(
+                status_code=404,
+                detail="Course not found"
             )
-
-            result.append({
-                "id": course.id,
-                "title": course.title,
-                "created_at": course.created_at,
-                "documents": [
-                    {
-                        "id": document.id,
-                        "filename": document.filename,
-                        "pages": document.pages,
-                        "chunks": document.chunks,
-                    }
-                    for document in documents
-                ],
-            })
-
-        return result
 
     finally:
         db.close()
+
+    try:
+        result = ask_tutor(
+            request.question,
+            request.course_id
+        )
+
+        return {
+            "topic": result.topic,
+            "concept": result.concept,
+            "lesson": result.lesson,
+            "quiz_question": result.quiz_question,
+            "expected_answer": result.expected_answer,
+            "quiz_explanation": result.quiz_explanation
+        }
+
+    except Exception as e:
+        import traceback
+
+        print("\n========== TUTOR ERROR ==========")
+        print("Error:", repr(e))
+        traceback.print_exc()
+        print("=================================\n")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Tutor failed to process the question."
+        )
