@@ -16,7 +16,11 @@ import shutil
 import uuid
 
 from ingest import ingest_pdf
-from ask import ask_tutor
+from ask import (
+    ask_tutor,
+    evaluate_answer,
+    TutorResponse,
+)
 from firebase_config import verify_token
 from database import SessionLocal
 from models import User, Course, Document
@@ -28,6 +32,12 @@ security = HTTPBearer()
 class AskRequest(BaseModel):
     question: str
     course_id: str
+    
+class EvaluateRequest(BaseModel):
+    quiz_question: str
+    expected_answer: str
+    quiz_explanation: str
+    student_answer: str
 
 # -----------------------------
 # CORS
@@ -191,6 +201,7 @@ def get_courses(current_user=Depends(get_current_user)):
 
     finally:
         db.close()
+
 # -----------------------------
 # Upload PDF
 # -----------------------------
@@ -316,7 +327,7 @@ async def upload_pdf(
         "status": "ready"
     }
     
-    
+   
     
 @app.post("/ask")
 def ask_tutor_endpoint(
@@ -373,4 +384,56 @@ def ask_tutor_endpoint(
         raise HTTPException(
             status_code=500,
             detail="Tutor failed to process the question."
+        )
+
+
+
+
+@app.post("/evaluate")
+def evaluate_student_answer(
+    request: EvaluateRequest,
+    current_user=Depends(get_current_user)
+):
+    # Make sure the user is authenticated
+    get_or_create_user(current_user)
+
+    try:
+        # Reconstruct the TutorResponse expected by
+        # evaluate_answer()
+        tutor_response = TutorResponse(
+            topic="",
+            concept="",
+            lesson="",
+            quiz_question=request.quiz_question,
+            expected_answer=request.expected_answer,
+            quiz_explanation=request.quiz_explanation,
+        )
+
+        evaluation = evaluate_answer(
+            tutor_response,
+            request.student_answer
+        )
+
+        if evaluation is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Could not evaluate the answer."
+            )
+
+        return {
+            "correct": evaluation.correct,
+            "feedback": evaluation.feedback,
+        }
+
+    except Exception as e:
+        import traceback
+
+        print("\n========== EVALUATION ERROR ==========")
+        print("Error:", repr(e))
+        traceback.print_exc()
+        print("======================================\n")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to evaluate answer."
         )

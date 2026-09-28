@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+:root {
+  --learnai-bg: #F5FFFA;
+  --learnai-surface: #FFFFFF;
+  --learnai-primary: #164E63;
+  --learnai-primary-soft: #E6F4F1;
+  --learnai-accent: #F97360;
+  --learnai-accent-soft: #FFF0EC;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -9,4 +18,91 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+}
+
+/* =========================
+   LearnAI Custom Scrollbar
+   ========================= */
+
+.scrollbar-dark::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+
+/* Light mode */
+
+.scrollbar-light::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-light::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+}
+
+.scrollbar-light::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+
+/* Firefox */
+
+.scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.scrollbar-light {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+
+.learnai-bg {
+  background-color: var(--learnai-bg);
+}
+
+.learnai-secondary {
+  background-color: var(--learnai-secondary);
+}
+
+.learnai-surface {
+  background-color: var(--learnai-surface);
+}
+
+.learnai-accent {
+  background-color: var(--learnai-accent);
+}
+
+.learnai-neutral {
+  background-color: var(--learnai-neutral);
+}
+
+.learnai-primary {
+  background-color: var(--learnai-primary);
+}
+
+.learnai-primary-border {
+  border-color: var(--learnai-primary);
+}
+
+.learnai-primary-text {
+  color: var(--learnai-primary);
 }
