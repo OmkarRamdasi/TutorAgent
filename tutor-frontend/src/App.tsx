@@ -1,8 +1,18 @@
 import { useState } from "react";
+import {
+  Routes, Route, Navigate, useNavigate,
+  useParams,
+} from "react-router-dom";
+import {
+  ArrowRight,
+  BookOpen,
+  Check,
+  Play,
+  Sparkles,
+} from "lucide-react";
 import { Toaster } from "sonner";
 
 import { useAuth } from "./context/AuthContext";
-import { useCourses } from "./context/CourseContext";
 import { useTheme } from "./context/ThemeContext";
 
 import Header from "./components/layout/Header";
@@ -10,21 +20,211 @@ import Sidebar from "./components/layout/Sidebar";
 import UploadCard from "./components/courses/UploadCard";
 import CourseLibrary from "./components/courses/CourseLibrary";
 import Tutor from "./components/tutor/Tutor";
+import LibraryDetail from "./components/courses/LibraryDetail";
+import AuthLoadingScreen from "./components/ui/AuthLoadingScreen";
 
-function App() {
+function Dashboard() {
+  const { darkMode } = useTheme();
+  return (
+    <div
+      className={
+        darkMode
+          ? "min-h-screen bg-zinc-950 text-white transition-colors duration-300"
+          : "min-h-screen bg-(--learnai-bg) text-(--learnai-primary) transition-colors duration-300"
+      }
+    >
+      <Toaster
+        position="bottom-right"
+        theme={darkMode ? "dark" : "light"}
+        richColors
+        closeButton
+      />
+
+      {/* HEADER */}
+
+      <Header />
+
+      {/* BODY */}
+
+      <div className="flex">
+        {/* SIDEBAR */}
+
+        <Sidebar />
+
+        {/* MAIN CONTENT */}
+
+        <main className="flex-1">
+          <div className="mx-auto max-w-5xl px-6 py-12">
+
+            {/* GREETING */}
+
+            <div className="mb-10">
+              <p
+                className={
+                  darkMode
+                    ? "text-sm text-zinc-500"
+                    : "text-sm text-(--learnai-primary)/60"
+                }
+              >
+                Your learning space
+              </p>
+
+              <h1
+                className={
+                  darkMode
+                    ? "mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl"
+                    : "mt-2 text-3xl font-semibold tracking-tight text-(--learnai-primary) sm:text-4xl"
+                }
+              >
+                What do you want to learn?
+              </h1>
+
+              <p
+                className={
+                  darkMode
+                    ? "mt-3 text-zinc-400"
+                    : "mt-3 text-(--learnai-primary)/70"
+                }
+              >
+                Upload your material and your AI tutor will
+                teach you from it.
+              </p>
+            </div>
+
+            {/* UPLOAD CARD */}
+
+            <UploadCard />
+
+            {/* ASK TUTOR */}
+
+            <Tutor />
+
+            {/* LIBRARY */}
+
+            <CourseLibrary />
+
+            {/* QUICK ACTIONS */}
+
+            <div className="mt-10">
+              <h2
+                className={
+                  darkMode
+                    ? "mb-4 text-sm font-medium text-zinc-300"
+                    : "mb-4 text-sm font-medium text-(--learnai-primary)"
+                }
+              >
+                Quick actions
+              </h2>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                {[
+                  {
+                    title: "Continue learning",
+                    description: "Resume where you left off",
+                    icon: Play,
+                  },
+                  {
+                    title: "Practice",
+                    description: "Test your understanding",
+                    icon: Sparkles,
+                  },
+                  {
+                    title: "Take a quiz",
+                    description: "Challenge yourself",
+                    icon: Check,
+                  },
+                ].map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <button
+                      key={item.title}
+                      type="button"
+                      className={
+                        darkMode
+                          ? "rounded-xl border border-white/10 bg-white/[0.02] p-5 text-left transition hover:bg-white/[0.05]"
+                          : "rounded-xl border border-(--learnai-primary-soft) bg-(--learnai-surface) p-5 text-left transition hover:border-(--learnai-primary) hover:bg-(--learnai-primary-soft)"
+                      }
+                    >
+                      <div
+                        className={
+                          darkMode
+                            ? "mb-4 flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white"
+                            : "mb-4 flex h-9 w-9 items-center justify-center rounded-lg bg-(--learnai-primary-soft) text-black"
+                        }
+                      >
+                        <Icon size={17} strokeWidth={1.8} />
+                      </div>
+
+                      <h3
+                        className={
+                          darkMode
+                            ? "text-sm font-medium text-white"
+                            : "text-sm font-medium text-(--learnai-primary)"
+                        }
+                      >
+                        {item.title}
+                      </h3>
+
+                      <p
+                        className={
+                          darkMode
+                            ? "mt-1 text-xs text-zinc-500"
+                            : "mt-1 text-xs text-(--learnai-primary)/60"
+                        }
+                      >
+                        {item.description}
+                      </p>
+
+                      <div
+                        className={
+                          darkMode
+                            ? "mt-4 flex items-center gap-1 text-xs text-zinc-400"
+                            : "mt-4 flex items-center gap-1 text-xs text-zinc-500"
+                        }
+                      >
+                        Open
+                        <ArrowRight size={13} />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+/*
+ * ============================
+ * LIBRARY DETAIL
+ * ============================
+ *
+ * Temporary placeholder.
+ * We will build the actual LibraryDetail
+ * page next.
+ */
+
+
+
+/*
+ * ============================
+ * LOGIN / SIGN UP
+ * ============================
+ */
+
+function AuthScreen() {
   const {
-    user,
     login,
     signup,
     loading,
     error,
   } = useAuth();
 
-  const {
-    darkMode,
-  } = useTheme();
-
-  const { courses } = useCourses();
+  const { darkMode } = useTheme();
 
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -44,224 +244,17 @@ function App() {
     }
   };
 
-  const testCourses = async () => {
-    if (!user) {
-      console.log("No user logged in");
-      return;
-    }
-
-    try {
-      const token = await user.getIdToken();
-
-      const response = await fetch(
-        "http://localhost:8000/courses",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      console.log("Courses:", data);
-    } catch (error) {
-      console.error("Failed to fetch courses:", error);
-    }
-  };
-
-  /*
-   * ============================
-   * LOGGED-IN DASHBOARD
-   * ============================
-   */
-
-  if (user) {
-    return (
-      <div
-        className={
-          darkMode
-            ? "min-h-screen bg-zinc-950 text-white transition-colors duration-300"
-            : "min-h-screen bg-[var(--learnai-bg)] text-[var(--learnai-primary)] transition-colors duration-300"
-        }
-      >
-        <Toaster
-          position="bottom-right"
-          theme={darkMode ? "dark" : "light"}
-          richColors
-          closeButton
-        />
-
-        {/* HEADER */}
-
-        <Header
-          onTestCourses={testCourses}
-        />
-
-        {/* BODY */}
-
-        <div className="flex">
-
-          {/* SIDEBAR */}
-
-          <Sidebar />
-
-          {/* MAIN CONTENT */}
-
-          <main className="flex-1">
-
-            <div className="mx-auto max-w-5xl px-6 py-12">
-
-              {/* GREETING */}
-
-              <div className="mb-10">
-
-                <p
-                  className={
-                    darkMode
-                      ? "text-sm text-zinc-500"
-                      : "text-sm text-[var(--learnai-primary)]/60"
-                  }
-                >
-                  Your learning space
-                </p>
-
-                <h1
-                  className={
-                    darkMode
-                      ? "mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl"
-                      : "mt-2 text-3xl font-semibold tracking-tight text-[var(--learnai-primary)] sm:text-4xl"
-                  }
-                >
-                  What do you want to learn?
-                </h1>
-
-                <p
-                  className={
-                    darkMode
-                      ? "mt-3 text-zinc-400"
-                      : "mt-3 text-[var(--learnai-primary)]/70"
-                  }
-                >
-                  Upload your material and your AI tutor will
-                  teach you from it.
-                </p>
-
-              </div>
-
-              {/* UPLOAD CARD */}
-
-              <UploadCard />
-
-              {/* ASK TUTOR */}
-
-              <Tutor />
-
-              {/* LIBRARY */}
-
-              <CourseLibrary />
-
-              {/* QUICK ACTIONS */}
-
-              <div className="mt-10">
-
-                <h2
-                  className={
-                    darkMode
-                      ? "mb-4 text-sm font-medium text-zinc-300"
-                      : "mb-4 text-sm font-medium text-[var(--learnai-primary)]"
-                  }
-                >
-                  Quick actions
-                </h2>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-
-                  {[
-                    {
-                      title: "Continue learning",
-                      description: "Resume where you left off",
-                      icon: "▶",
-                    },
-                    {
-                      title: "Practice",
-                      description: "Test your understanding",
-                      icon: "✦",
-                    },
-                    {
-                      title: "Take a quiz",
-                      description: "Challenge yourself",
-                      icon: "✓",
-                    },
-                  ].map((item) => (
-                    <button
-                      key={item.title}
-                      className={
-                        darkMode
-                          ? "rounded-xl border border-white/10 bg-white/[0.02] p-5 text-left transition hover:bg-white/[0.05]"
-                          : "rounded-xl border border-[var(--learnai-primary-soft)] bg-[var(--learnai-surface)] p-5 text-left transition hover:border-[var(--learnai-primary)] hover:bg-[var(--learnai-primary-soft)]"
-                      }
-                    >
-
-                      <div
-                        className={
-                          darkMode
-                            ? "mb-4 text-lg"
-                            : "mb-4 text-lg text-[var(--learnai-accent)]"
-                        }
-                      >
-                        {item.icon}
-                      </div>
-
-                      <h3
-                        className={
-                          darkMode
-                            ? "text-sm font-medium text-white"
-                            : "text-sm font-medium text-[var(--learnai-primary)]"
-                        }
-                      >
-                        {item.title}
-                      </h3>
-
-                      <p
-                        className={
-                          darkMode
-                            ? "mt-1 text-xs text-zinc-500"
-                            : "mt-1 text-xs text-[var(--learnai-primary)]/60"
-                        }
-                      >
-                        {item.description}
-                      </p>
-
-                    </button>
-                  ))}
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </main>
-
-        </div>
-      </div>
-    );
-  }
-
-  /*
-   * ============================
-   * LOGIN / SIGN UP
-   * ============================
-   */
-
   return (
-    <div className="min-h-screen bg-[var(--learnai-bg)] text-[var(--learnai-primary)]">
-
+    <div
+      className={
+        darkMode
+          ? "min-h-screen bg-zinc-950 text-white"
+          : "min-h-screen bg-(--learnai-bg) text-(--learnai-primary)"
+      }
+    >
       <Toaster
         position="bottom-right"
-        theme="light"
+        theme={darkMode ? "dark" : "light"}
         richColors
         closeButton
       />
@@ -271,57 +264,89 @@ function App() {
         {/* HEADER */}
 
         <header className="flex h-16 items-center justify-between px-6">
-
           <div className="flex items-center gap-2">
-
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--learnai-primary)] text-white">
-              ✦
+            <div
+              className={
+                darkMode
+                  ? "flex h-8 w-8 items-center justify-center rounded-lg bg-white text-black"
+                  : "flex h-8 w-8 items-center justify-center rounded-lg bg-black text-white"
+              }
+            >
+              <Sparkles size={16} strokeWidth={2} />
             </div>
 
-            <span className="font-semibold text-[var(--learnai-primary)]">
+            <span
+              className={
+                darkMode
+                  ? "font-semibold text-white"
+                  : "font-semibold text-black"
+              }
+            >
               LearnAI
             </span>
-
           </div>
 
-          <span className="text-sm text-[var(--learnai-primary)]/60">
+          <span
+            className={
+              darkMode
+                ? "text-sm text-zinc-500"
+                : "text-sm text-zinc-500"
+            }
+          >
             Your personal AI tutor
           </span>
-
         </header>
 
         {/* MAIN */}
 
         <main className="flex flex-1 items-center justify-center px-6 py-12">
-
           <div className="w-full max-w-md">
 
             {/* INTRO */}
 
             <div className="mb-8 text-center">
-
-              <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--learnai-primary-soft)] text-2xl text-[var(--learnai-primary)]">
-                ✦
+              <div
+                className={
+                  darkMode
+                    ? "mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white"
+                    : "mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-(--learnai-primary-soft) text-black"
+                }
+              >
+                <BookOpen size={24} strokeWidth={1.8} />
               </div>
 
-              <h1 className="text-3xl font-semibold tracking-tight text-[var(--learnai-primary)]">
-                {isLogin
-                  ? "Welcome back"
-                  : "Start learning"}
+              <h1
+                className={
+                  darkMode
+                    ? "text-3xl font-semibold tracking-tight text-white"
+                    : "text-3xl font-semibold tracking-tight text-black"
+                }
+              >
+                {isLogin ? "Welcome back" : "Start learning"}
               </h1>
 
-              <p className="mt-3 text-sm leading-6 text-[var(--learnai-primary)]/65">
+              <p
+                className={
+                  darkMode
+                    ? "mt-3 text-sm leading-6 text-zinc-400"
+                    : "mt-3 text-sm leading-6 text-zinc-500"
+                }
+              >
                 {isLogin
                   ? "Continue learning with your personal AI tutor."
                   : "Create your account and learn anything with AI."}
               </p>
-
             </div>
 
             {/* AUTH CARD */}
 
-            <div className="rounded-2xl border border-[var(--learnai-primary-soft)] bg-[var(--learnai-surface)] p-6 shadow-sm">
-
+            <div
+              className={
+                darkMode
+                  ? "rounded-2xl border border-white/10 bg-white/[0.02] p-6 shadow-sm"
+                  : "rounded-2xl border border-(--learnai-primary-soft) bg-(--learnai-surface) p-6 shadow-sm"
+              }
+            >
               <form
                 onSubmit={handleSubmit}
                 className="space-y-5"
@@ -330,8 +355,13 @@ function App() {
                 {/* EMAIL */}
 
                 <div>
-
-                  <label className="mb-2 block text-sm font-medium text-[var(--learnai-primary)]">
+                  <label
+                    className={
+                      darkMode
+                        ? "mb-2 block text-sm font-medium text-white"
+                        : "mb-2 block text-sm font-medium text-black"
+                    }
+                  >
                     Email
                   </label>
 
@@ -343,16 +373,24 @@ function App() {
                     }
                     placeholder="you@example.com"
                     required
-                    className="w-full rounded-xl border border-[var(--learnai-primary-soft)] bg-[var(--learnai-bg)] px-4 py-3 text-sm text-[var(--learnai-primary)] outline-none placeholder:text-[var(--learnai-primary)]/40 transition focus:border-[var(--learnai-primary)]"
+                    className={
+                      darkMode
+                        ? "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-600 transition focus:border-white/30"
+                        : "w-full rounded-xl border border-(--learnai-primary-soft) bg-(--learnai-bg) px-4 py-3 text-sm text-black outline-none placeholder:text-zinc-400 transition focus:border-black"
+                    }
                   />
-
                 </div>
 
                 {/* PASSWORD */}
 
                 <div>
-
-                  <label className="mb-2 block text-sm font-medium text-[var(--learnai-primary)]">
+                  <label
+                    className={
+                      darkMode
+                        ? "mb-2 block text-sm font-medium text-white"
+                        : "mb-2 block text-sm font-medium text-black"
+                    }
+                  >
                     Password
                   </label>
 
@@ -364,15 +402,18 @@ function App() {
                     }
                     placeholder="••••••••"
                     required
-                    className="w-full rounded-xl border border-[var(--learnai-primary-soft)] bg-[var(--learnai-bg)] px-4 py-3 text-sm text-[var(--learnai-primary)] outline-none placeholder:text-[var(--learnai-primary)]/40 transition focus:border-[var(--learnai-primary)]"
+                    className={
+                      darkMode
+                        ? "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-600 transition focus:border-white/30"
+                        : "w-full rounded-xl border border-(--learnai-primary-soft) bg-(--learnai-bg) px-4 py-3 text-sm text-black outline-none placeholder:text-zinc-400 transition focus:border-black"
+                    }
                   />
-
                 </div>
 
                 {/* ERROR */}
 
                 {error && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                  <div className={darkMode ? "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-zinc-300" : "rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700"}>
                     {error}
                   </div>
                 )}
@@ -382,7 +423,11 @@ function App() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full rounded-xl bg-[var(--learnai-accent)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={
+                    darkMode
+                      ? "w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      : "w-full rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  }
                 >
                   {loading
                     ? "Please wait..."
@@ -390,69 +435,161 @@ function App() {
                       ? "Continue"
                       : "Create account"}
                 </button>
-
               </form>
 
               {/* DIVIDER */}
 
               <div className="my-6 flex items-center gap-3">
+                <div
+                  className={
+                    darkMode
+                      ? "h-px flex-1 bg-white/10"
+                      : "h-px flex-1 bg-(--learnai-primary-soft)"
+                  }
+                />
 
-                <div className="h-px flex-1 bg-[var(--learnai-primary-soft)]" />
-
-                <span className="text-xs text-[var(--learnai-primary)]/40">
+                <span className="text-xs text-zinc-500">
                   OR
                 </span>
 
-                <div className="h-px flex-1 bg-[var(--learnai-primary-soft)]" />
-
+                <div
+                  className={
+                    darkMode
+                      ? "h-px flex-1 bg-white/10"
+                      : "h-px flex-1 bg-(--learnai-primary-soft)"
+                  }
+                />
               </div>
 
               {/* GOOGLE */}
 
               <button
                 type="button"
-                className="w-full rounded-xl border border-[var(--learnai-primary-soft)] bg-[var(--learnai-surface)] px-4 py-3 text-sm font-medium text-[var(--learnai-primary)] transition hover:bg-[var(--learnai-primary-soft)]"
+                className={
+                  darkMode
+                    ? "w-full rounded-xl border border-white/10 bg-transparent px-4 py-3 text-sm font-medium text-white transition hover:bg-white/5"
+                    : "w-full rounded-xl border border-(--learnai-primary-soft) bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-(--learnai-primary-soft)"
+                }
               >
                 Continue with Google
               </button>
-
             </div>
 
             {/* SWITCH LOGIN / SIGNUP */}
 
-            <p className="mt-6 text-center text-sm text-[var(--learnai-primary)]/60">
-
+            <p
+              className={
+                darkMode
+                  ? "mt-6 text-center text-sm text-zinc-500"
+                  : "mt-6 text-center text-sm text-zinc-500"
+              }
+            >
               {isLogin
                 ? "Don't have an account?"
                 : "Already have an account?"}
 
               <button
                 type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                }}
-                className="ml-1 font-medium text-[var(--learnai-accent)] hover:underline"
+                onClick={() => setIsLogin(!isLogin)}
+                className={
+                  darkMode
+                    ? "ml-1 font-medium text-white hover:underline"
+                    : "ml-1 font-medium text-black hover:underline"
+                }
               >
-                {isLogin
-                  ? "Create one"
-                  : "Sign in"}
+                {isLogin ? "Create one" : "Sign in"}
               </button>
-
             </p>
-
           </div>
-
         </main>
 
         {/* FOOTER */}
 
-        <footer className="px-6 py-6 text-center text-xs text-[var(--learnai-primary)]/40">
+        <footer
+          className={
+            darkMode
+              ? "px-6 py-6 text-center text-xs text-zinc-600"
+              : "px-6 py-6 text-center text-xs text-zinc-400"
+          }
+        >
           Learn anything. Understand everything.
         </footer>
-
       </div>
-
     </div>
+  );
+}
+
+/*
+ * ============================
+ * APP
+ * ============================
+ */
+function TutorPage() {
+  const { darkMode } = useTheme();
+  const { courseId } = useParams();
+  const navigate = useNavigate();
+
+  return (
+    <div
+      className={`min-h-screen transition-colors duration-300 ${darkMode
+        ? "bg-black text-white"
+        : "bg-(--learnai-background) text-(--learnai-primary)"
+        }`}
+    >
+      <Header />
+
+      <div className="flex">
+        <Sidebar />
+
+        <main className="flex-1">
+          <div className="mx-auto max-w-5xl px-6 py-8">
+            <button
+              type="button"
+              onClick={() => navigate(`/app/library/${courseId}`)}
+              className={`mb-6 flex items-center gap-2 rounded-lg border px-4 py-2 text-sm transition-colors ${darkMode
+                ? "border-white/10 bg-white/[0.03] text-white hover:bg-white/[0.07]"
+                : "border-(--learnai-primary-soft) bg-white text-(--learnai-primary) hover:bg-(--learnai-surface)"
+                }`}
+            >
+              ← Back to Course
+            </button>
+
+            <Tutor />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+function App() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/app" element={<Dashboard />} />
+
+      <Route
+        path="/app/library/:courseId"
+        element={<LibraryDetail />}
+      />
+      <Route
+        path="/app/tutor/:courseId"
+        element={<TutorPage />}
+      />
+
+      <Route
+        path="*"
+        element={<Navigate to="/app" replace />}
+      />
+    </Routes>
   );
 }
 

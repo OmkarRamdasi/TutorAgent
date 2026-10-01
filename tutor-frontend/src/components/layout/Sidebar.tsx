@@ -1,41 +1,33 @@
+import { BarChart3, FileText, Plus, Settings } from "lucide-react";
 import { useCourses } from "../../context/CourseContext";
 import { useTheme } from "../../context/ThemeContext";
 
 export default function Sidebar() {
-  const { courses } = useCourses();
+  const { courses, loadingCourses } = useCourses();
   const { darkMode } = useTheme();
 
   return (
     <aside
       className={
         darkMode
-          ? "hidden min-h-[calc(100vh-4rem)] w-64 border-r border-white/10 p-4 md:block"
-          : "hidden min-h-[calc(100vh-4rem)] w-64 border-r border-[var(--learnai-primary-soft)] bg-[var(--learnai-bg)] p-4 md:block"
+          ? "relative hidden min-h-[calc(100vh-4rem)] w-64 border-r border-white/10 p-4 md:block"
+          : "relative hidden min-h-[calc(100vh-4rem)] w-64 border-r border-(--learnai-primary-soft) bg-(--learnai-bg) p-4 md:block"
       }
     >
-      {/* NEW COURSE */}
-
       <button
         type="button"
         className={
           darkMode
-            ? "mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-medium text-black hover:bg-zinc-200"
-            : "mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--learnai-accent)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+            ? "mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:bg-zinc-200"
+            : "mb-8 flex w-full items-center justify-center gap-2 rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
         }
       >
-        + New Course
+        <Plus size={16} />
+        New Course
       </button>
 
-      {/* LIBRARY */}
-
       <div>
-        <p
-          className={
-            darkMode
-              ? "mb-3 px-2 text-xs font-medium uppercase tracking-wider text-zinc-500"
-              : "mb-3 px-2 text-xs font-semibold uppercase tracking-wider text-[var(--learnai-primary)]/50"
-          }
-        >
+        <p className="mb-3 px-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
           Your Library
         </p>
 
@@ -44,53 +36,50 @@ export default function Sidebar() {
             type="button"
             className={
               darkMode
-                ? "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-zinc-400 hover:bg-white/5 hover:text-white"
-                : "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-[var(--learnai-primary)] transition hover:bg-[var(--learnai-primary-soft)]"
+                ? "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-zinc-400 transition hover:bg-white/5 hover:text-white"
+                : "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-(--learnai-primary-soft)"
             }
           >
-            <span>📄 Your documents</span>
+            <span className="flex items-center gap-2">
+              <FileText size={15} />
+              Your documents
+            </span>
 
-            {courses.length > 0 && (
-              <span
-                className={
-                  darkMode
-                    ? "rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs text-indigo-400"
-                    : "rounded-full bg-[var(--learnai-primary-soft)] px-2 py-0.5 text-xs font-medium text-[var(--learnai-primary)]"
-                }
-              >
+            {loadingCourses ? (
+              <span className="h-5 w-7 animate-pulse rounded-full bg-zinc-200 dark:bg-white/10" />
+            ) : courses.length > 0 ? (
+              <span className={darkMode ? "rounded-full bg-white/10 px-2 py-0.5 text-xs text-zinc-300" : "rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700"}>
                 {courses.length}
               </span>
-            )}
+            ) : null}
           </button>
         </div>
       </div>
 
-      {/* BOTTOM */}
-
-      <div className="absolute bottom-6 w-56">
-
+      <div className="absolute bottom-6 left-4 right-4 space-y-1">
         <button
           type="button"
           className={
             darkMode
-              ? "w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-400 hover:bg-white/5"
-              : "w-full rounded-lg px-3 py-2 text-left text-sm text-[var(--learnai-primary)] transition hover:bg-[var(--learnai-primary-soft)]"
+              ? "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-zinc-400 transition hover:bg-white/5"
+              : "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-(--learnai-primary-soft)"
           }
         >
-          📊 Progress
+          <BarChart3 size={15} />
+          Progress
         </button>
 
         <button
           type="button"
           className={
             darkMode
-              ? "w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-400 hover:bg-white/5"
-              : "w-full rounded-lg px-3 py-2 text-left text-sm text-[var(--learnai-primary)] transition hover:bg-[var(--learnai-primary-soft)]"
+              ? "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-zinc-400 transition hover:bg-white/5"
+              : "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-(--learnai-primary-soft)"
           }
         >
-          ⚙ Settings
+          <Settings size={15} />
+          Settings
         </button>
-
       </div>
     </aside>
   );

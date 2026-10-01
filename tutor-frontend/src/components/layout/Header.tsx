@@ -1,15 +1,8 @@
+import { Moon, Sparkles, Sun, LogOut } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 
-interface HeaderProps {
-  onTestCourses?: () => void;
-  onTestTutor?: () => void;
-}
-
-export default function Header({
-  onTestCourses,
-  onTestTutor,
-}: HeaderProps) {
+export default function Header() {
   const { user, logout } = useAuth();
   const { darkMode, toggleTheme } = useTheme();
 
@@ -26,109 +19,55 @@ export default function Header({
       className={
         darkMode
           ? "h-16 border-b border-white/10"
-          : "h-16 border-b border-[var(--learnai-primary-soft)] bg-[var(--learnai-surface)]"
+          : "h-16 border-b border-(--learnai-primary-soft) bg-(--learnai-surface)"
       }
     >
       <div className="flex h-full items-center justify-between px-6">
-
-        {/* LOGO */}
-
         <div className="flex items-center gap-2">
           <div
             className={
               darkMode
                 ? "flex h-8 w-8 items-center justify-center rounded-lg bg-white text-black"
-                : "flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--learnai-primary)] text-white"
+                : "flex h-8 w-8 items-center justify-center rounded-lg bg-black text-white"
             }
           >
-            ✦
+            <Sparkles size={16} strokeWidth={2} />
           </div>
-
-          <span
-            className={
-              darkMode
-                ? "font-semibold text-white"
-                : "font-semibold text-[var(--learnai-primary)]"
-            }
-          >
+          <span className={darkMode ? "font-semibold text-white" : "font-semibold text-black"}>
             LearnAI
           </span>
         </div>
 
-        {/* RIGHT SIDE */}
-
         <div className="flex items-center gap-3">
-
-          {/* THEME */}
-
           <button
             type="button"
             onClick={toggleTheme}
+            aria-label={darkMode ? "Switch to light theme" : "Switch to dark theme"}
             className={
               darkMode
-                ? "flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 hover:bg-white/10"
-                : "flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--learnai-primary-soft)] bg-[var(--learnai-surface)] text-[var(--learnai-primary)] transition hover:bg-[var(--learnai-primary-soft)]"
+                ? "flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 text-white transition hover:bg-white/10"
+                : "flex h-9 w-9 items-center justify-center rounded-lg border border-(--learnai-primary-soft) bg-(--learnai-surface) text-black transition hover:bg-(--learnai-primary-soft)"
             }
           >
-            {darkMode ? "☀️" : "🌙"}
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {/* EMAIL */}
-
-          <span
-            className={
-              darkMode
-                ? "hidden text-sm text-zinc-400 sm:block"
-                : "hidden text-sm text-[var(--learnai-primary)]/60 sm:block"
-            }
-          >
+          <span className={darkMode ? "hidden max-w-52 truncate text-sm text-zinc-400 sm:block" : "hidden max-w-52 truncate text-sm text-zinc-500 sm:block"}>
             {user?.email}
           </span>
-
-          {/* TEMPORARY TEST BUTTONS */}
-
-          {onTestCourses && (
-            <button
-              type="button"
-              onClick={onTestCourses}
-              className={
-                darkMode
-                  ? "rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white"
-                  : "rounded-lg bg-[var(--learnai-accent)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-              }
-            >
-              Test Courses
-            </button>
-          )}
-
-          {onTestTutor && (
-            <button
-              type="button"
-              onClick={onTestTutor}
-              className={
-                darkMode
-                  ? "rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white"
-                  : "rounded-lg bg-[var(--learnai-accent)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-              }
-            >
-              Test Tutor
-            </button>
-          )}
-
-          {/* LOGOUT */}
 
           <button
             type="button"
             onClick={handleLogout}
             className={
               darkMode
-                ? "rounded-lg border border-white/10 px-4 py-2 text-sm hover:bg-white/10"
-                : "rounded-lg border border-[var(--learnai-primary-soft)] bg-[var(--learnai-surface)] px-4 py-2 text-sm font-medium text-[var(--learnai-primary)] transition hover:bg-[var(--learnai-primary-soft)]"
+                ? "flex items-center gap-2 rounded-lg border border-white/10 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                : "flex items-center gap-2 rounded-lg border border-(--learnai-primary-soft) bg-(--learnai-surface) px-4 py-2 text-sm font-medium text-black transition hover:bg-(--learnai-primary-soft)"
             }
           >
-            Logout
+            <LogOut size={15} />
+            <span>Logout</span>
           </button>
-
         </div>
       </div>
     </header>

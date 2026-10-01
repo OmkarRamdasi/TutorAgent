@@ -16,9 +16,20 @@ interface TutorResponse {
   quiz_explanation: string;
 }
 
+interface EvaluationProgress {
+  topic: string;
+  concept: string;
+  attempts: number;
+  correct: number;
+  incorrect: number;
+  mastery: number;
+  status: string;
+}
+
 interface Evaluation {
   correct: boolean;
   feedback: string;
+  progress?: EvaluationProgress;
 }
 
 interface TutorContextType {
@@ -28,6 +39,7 @@ interface TutorContextType {
   tutorResponse: TutorResponse | null;
 
   askingTutor: boolean;
+  tutorError: string;
 
   askTutor: (
     question: string,
@@ -37,9 +49,11 @@ interface TutorContextType {
   evaluation: Evaluation | null;
 
   evaluatingAnswer: boolean;
+  evaluationError: string;
 
   evaluateAnswer: (
-    studentAnswer: string
+    studentAnswer: string,
+    courseId: string
   ) => Promise<Evaluation>;
 }
 
@@ -66,16 +80,27 @@ export function TutorProvider({
   const [askingTutor, setAskingTutor] =
     useState(false);
 
+  const [tutorError, setTutorError] =
+    useState("");
+
   const [evaluation, setEvaluation] =
     useState<Evaluation | null>(null);
 
   const [evaluatingAnswer, setEvaluatingAnswer] =
     useState(false);
 
+  const [evaluationError, setEvaluationError] =
+    useState("");
+
+  // ============================================================
+  // ASK TUTOR
+  // ============================================================
+
   const askTutor = async (
     question: string,
     courseId: string
   ): Promise<TutorResponse> => {
+
     if (!user) {
       throw new Error(
         "Please log in first."
@@ -83,9 +108,12 @@ export function TutorProvider({
     }
 
     setAskingTutor(true);
+    setTutorError("");
     setEvaluation(null);
+    setEvaluationError("");
 
     try {
+
       const token =
         await user.getIdToken();
 
@@ -93,20 +121,27 @@ export function TutorProvider({
         "http://localhost:8000/ask",
         {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+
+            Authorization:
+              `Bearer ${token}`,
           },
+
           body: JSON.stringify({
             question,
+
             course_id: courseId,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
+
         throw new Error(
           data.detail ||
           "Tutor request failed."
@@ -116,29 +151,52 @@ export function TutorProvider({
       setTutorResponse(data);
 
       return data;
+
+    } catch (error) {
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Tutor request failed.";
+
+      setTutorError(message);
+
+      throw error;
+
     } finally {
+
       setAskingTutor(false);
     }
   };
 
+  // ============================================================
+  // EVALUATE ANSWER
+  // ============================================================
+
   const evaluateAnswer = async (
-    studentAnswer: string
+    studentAnswer: string,
+    courseId: string
   ): Promise<Evaluation> => {
+
     if (!user) {
+
       throw new Error(
         "Please log in first."
       );
     }
 
     if (!tutorResponse) {
+
       throw new Error(
         "No quiz question available."
       );
     }
 
     setEvaluatingAnswer(true);
+    setEvaluationError("");
 
     try {
+
       const token =
         await user.getIdToken();
 
@@ -146,11 +204,36 @@ export function TutorProvider({
         "http://localhost:8000/evaluate",
         {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+
+            Authorization:
+              `Bearer ${token}`,
           },
+
           body: JSON.stringify({
+
+            // -----------------------------------------
+            // Course
+            // -----------------------------------------
+
+            course_id: courseId,
+
+            // -----------------------------------------
+            // Learning context
+            // -----------------------------------------
+
+            topic:
+              tutorResponse.topic,
+
+            concept:
+              tutorResponse.concept,
+
+            // -----------------------------------------
+            // Quiz
+            // -----------------------------------------
+
             quiz_question:
               tutorResponse.quiz_question,
 
@@ -160,15 +243,21 @@ export function TutorProvider({
             quiz_explanation:
               tutorResponse.quiz_explanation,
 
+            // -----------------------------------------
+            // Student answer
+            // -----------------------------------------
+
             student_answer:
               studentAnswer,
           }),
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
+
         throw new Error(
           data.detail ||
           "Answer evaluation failed."
@@ -178,20 +267,41 @@ export function TutorProvider({
       setEvaluation(data);
 
       return data;
+
+    } catch (error) {
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Answer evaluation failed.";
+
+      setEvaluationError(message);
+
+      throw error;
+
     } finally {
+
       setEvaluatingAnswer(false);
     }
   };
 
+  // ============================================================
+  // CONTEXT
+  // ============================================================
+
   return (
     <TutorContext.Provider
       value={{
+
         question,
+
         setQuestion,
 
         tutorResponse,
 
         askingTutor,
+
+        tutorError,
 
         askTutor,
 
@@ -199,7 +309,10 @@ export function TutorProvider({
 
         evaluatingAnswer,
 
+        evaluationError,
+
         evaluateAnswer,
+
       }}
     >
       {children}
@@ -207,11 +320,18 @@ export function TutorProvider({
   );
 }
 
+
+// ============================================================
+// useTutor
+// ============================================================
+
 export function useTutor() {
+
   const context =
     useContext(TutorContext);
 
   if (!context) {
+
     throw new Error(
       "useTutor must be used inside TutorProvider"
     );

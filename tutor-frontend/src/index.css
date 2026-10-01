@@ -1,12 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --learnai-bg: #F5FFFA;
+  --learnai-bg: #FFFFFF;
   --learnai-surface: #FFFFFF;
-  --learnai-primary: #164E63;
-  --learnai-primary-soft: #E6F4F1;
-  --learnai-accent: #F97360;
-  --learnai-accent-soft: #FFF0EC;
+
+  --learnai-primary: #000000;
+  --learnai-primary-soft: #E5E5E5;
+
+  --learnai-accent: #000000;
+  --learnai-accent-soft: #F5F5F5;
 }
 
 * {

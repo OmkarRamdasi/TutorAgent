@@ -1,21 +1,24 @@
 import { useState } from "react";
+import { CheckCircle2, FileQuestion } from "lucide-react";
 import { toast } from "sonner";
 
 import { useTheme } from "../../context/ThemeContext";
 import { useTutor } from "../../context/TutorContext";
+import { InlineError, Skeleton } from "../ui/Skeleton";
+import { useCourses } from "../../context/CourseContext";
 
 export default function TutorResponse() {
   const { darkMode } = useTheme();
-
+  const { courses } = useCourses();
   const {
     tutorResponse,
     evaluation,
     evaluatingAnswer,
+    evaluationError,
     evaluateAnswer,
   } = useTutor();
 
-  const [studentAnswer, setStudentAnswer] =
-    useState("");
+  const [studentAnswer, setStudentAnswer] = useState("");
 
   if (!tutorResponse) {
     return null;
@@ -27,14 +30,20 @@ export default function TutorResponse() {
       return;
     }
 
-    try {
-      await evaluateAnswer(studentAnswer.trim());
-    } catch (error) {
-      console.error(
-        "Evaluation failed:",
-        error
-      );
+    const courseId = courses[0]?.id;
 
+    if (!courseId) {
+      toast.warning("Please upload a course first.");
+      return;
+    }
+
+    try {
+      await evaluateAnswer(
+        studentAnswer.trim(),
+        courseId
+      );
+    } catch (error) {
+      console.error("Evaluation failed:", error);
       toast.error(
         error instanceof Error
           ? error.message
@@ -45,168 +54,90 @@ export default function TutorResponse() {
 
   return (
     <div className="mt-8">
+      <div className="mb-2 text-sm font-semibold text-zinc-500">
+        {tutorResponse.topic}
+      </div>
 
-      {/* TOPIC */}
+      <h3 className={darkMode ? "text-xl font-bold text-white" : "text-xl font-bold text-black"}>
+        {tutorResponse.concept}
+      </h3>
+
+      <div className={darkMode ? "mt-4 whitespace-pre-line leading-7 text-zinc-300" : "mt-4 whitespace-pre-line leading-7 text-zinc-700"}>
+        {tutorResponse.lesson}
+      </div>
 
       <div
         className={
           darkMode
-            ? "mb-2 text-sm font-medium text-indigo-400"
-            : "mb-2 text-sm font-semibold text-[var(--learnai-accent)]"
+            ? "mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5"
+            : "mt-8 rounded-2xl border border-zinc-200 bg-zinc-50 p-5"
         }
       >
-        {tutorResponse.topic}
-      </div>
-
-      {/* CONCEPT */}
-
-      <h3
-        className={`text-xl font-bold ${
-          darkMode
-            ? "text-white"
-            : "text-[var(--learnai-primary)]"
-        }`}
-      >
-        {tutorResponse.concept}
-      </h3>
-
-      {/* LESSON */}
-
-      <div
-        className={`mt-4 whitespace-pre-line leading-7 ${
-          darkMode
-            ? "text-zinc-300"
-            : "text-[var(--learnai-primary)]/80"
-        }`}
-      >
-        {tutorResponse.lesson}
-      </div>
-
-      {/* QUICK CHECK */}
-
-      <div
-        className={`mt-8 rounded-2xl border p-5 ${
-          darkMode
-            ? "border-white/10 bg-white/[0.04]"
-            : "border-[var(--learnai-primary-soft)] bg-[var(--learnai-primary-soft)]"
-        }`}
-      >
-
         <div className="flex items-center gap-2">
-
-          <span className="text-lg">
-            📝
-          </span>
-
-          <h4
-            className={`font-semibold ${
-              darkMode
-                ? "text-white"
-                : "text-[var(--learnai-primary)]"
-            }`}
-          >
+          <FileQuestion size={18} className={darkMode ? "text-white" : "text-black"} />
+          <h4 className={darkMode ? "font-semibold text-white" : "font-semibold text-black"}>
             Quick Check
           </h4>
-
         </div>
 
-        {/* QUESTION */}
-
-        <p
-          className={`mt-4 text-sm leading-6 ${
-            darkMode
-              ? "text-zinc-300"
-              : "text-[var(--learnai-primary)]/80"
-          }`}
-        >
+        <p className={darkMode ? "mt-4 text-sm leading-6 text-zinc-300" : "mt-4 text-sm leading-6 text-zinc-700"}>
           {tutorResponse.quiz_question}
         </p>
 
-        {/* ANSWER */}
-
         <textarea
           value={studentAnswer}
-          onChange={(e) =>
-            setStudentAnswer(e.target.value)
-          }
+          onChange={(e) => setStudentAnswer(e.target.value)}
           placeholder="Type your answer..."
           rows={3}
           disabled={evaluatingAnswer}
-          className={`mt-5 w-full resize-none rounded-xl border px-4 py-3 text-sm outline-none transition ${
+          className={
             darkMode
-              ? "border-zinc-700 bg-zinc-900 text-white placeholder:text-zinc-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-              : "border-[var(--learnai-primary-soft)] bg-[var(--learnai-bg)] text-[var(--learnai-primary)] placeholder:text-[var(--learnai-primary)]/40 focus:border-[var(--learnai-primary)] focus:ring-2 focus:ring-[var(--learnai-primary)]/10"
-          } ${
-            evaluatingAnswer
-              ? "cursor-not-allowed opacity-60"
-              : ""
-          }`}
+              ? "mt-5 w-full resize-none rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-white focus:ring-2 focus:ring-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              : "mt-5 w-full resize-none rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-black outline-none placeholder:text-zinc-400 focus:border-black focus:ring-2 focus:ring-black/10 disabled:cursor-not-allowed disabled:opacity-60"
+          }
         />
-
-        {/* CHECK ANSWER */}
 
         <button
           type="button"
-          onClick={handleEvaluateAnswer}
-          disabled={
-            evaluatingAnswer ||
-            !studentAnswer.trim()
-          }
-          className={`mt-3 rounded-xl px-5 py-3 text-sm font-semibold text-white transition ${
+          onClick={() => void handleEvaluateAnswer()}
+          disabled={evaluatingAnswer || !studentAnswer.trim()}
+          className={
             darkMode
-              ? "bg-indigo-600 hover:bg-indigo-500"
-              : "bg-[var(--learnai-accent)] hover:opacity-90"
-          } disabled:cursor-not-allowed disabled:opacity-50`}
+              ? "mt-3 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              : "mt-3 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          }
         >
-          {evaluatingAnswer
-            ? "Checking..."
-            : "Check Answer"}
+          {evaluatingAnswer ? "Checking..." : "Check Answer"}
         </button>
 
-        {/* FEEDBACK */}
-
-        {evaluation && (
-          <div
-            className={`mt-5 rounded-xl border p-4 ${
-              evaluation.correct
-                ? darkMode
-                  ? "border-emerald-500/20 bg-emerald-500/10"
-                  : "border-[var(--learnai-primary-soft)] bg-[var(--learnai-surface)]"
-                : darkMode
-                  ? "border-amber-500/20 bg-amber-500/10"
-                  : "border-[var(--learnai-accent-soft)] bg-[var(--learnai-surface)]"
-            }`}
-          >
-
-            <div
-              className={`font-semibold ${
-                evaluation.correct
-                  ? darkMode
-                    ? "text-emerald-400"
-                    : "text-[var(--learnai-primary)]"
-                  : darkMode
-                    ? "text-amber-400"
-                    : "text-[var(--learnai-accent)]"
-              }`}
-            >
-              {evaluation.correct
-                ? "✅ Correct!"
-                : "💡 Keep learning"}
+        {evaluatingAnswer && (
+          <div className="mt-5 space-y-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.02]">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-5 rounded-full" />
+              <Skeleton className="h-4 w-24" />
             </div>
-
-            <p
-              className={`mt-2 text-sm leading-6 ${
-                darkMode
-                  ? "text-zinc-300"
-                  : "text-[var(--learnai-primary)]/80"
-              }`}
-            >
-              {evaluation.feedback}
-            </p>
-
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-4/5" />
           </div>
         )}
 
+        {evaluationError && !evaluatingAnswer && (
+          <div className="mt-5">
+            <InlineError message={evaluationError} />
+          </div>
+        )}
+
+        {evaluation && !evaluatingAnswer && (
+          <div className={darkMode ? "mt-5 rounded-xl border border-white/10 bg-white/[0.04] p-4" : "mt-5 rounded-xl border border-zinc-200 bg-white p-4"}>
+            <div className={darkMode ? "flex items-center gap-2 font-semibold text-white" : "flex items-center gap-2 font-semibold text-black"}>
+              {evaluation.correct ? <CheckCircle2 size={17} /> : <FileQuestion size={17} />}
+              {evaluation.correct ? "Correct" : "Keep learning"}
+            </div>
+            <p className={darkMode ? "mt-2 text-sm leading-6 text-zinc-300" : "mt-2 text-sm leading-6 text-zinc-700"}>
+              {evaluation.feedback}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

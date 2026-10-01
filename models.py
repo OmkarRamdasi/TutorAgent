@@ -1,15 +1,6 @@
-from datetime import datetime
-
-from sqlalchemy import (
-    Column,
-    String,
-    Integer,
-    DateTime,
-    ForeignKey,
-    Text,
-)
-
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 from database import Base
 
@@ -19,11 +10,7 @@ class User(Base):
 
     id = Column(String, primary_key=True)
     email = Column(String, unique=True, nullable=False)
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     courses = relationship(
         "Course",
@@ -36,22 +23,9 @@ class Course(Base):
     __tablename__ = "courses"
 
     id = Column(String, primary_key=True)
-
-    user_id = Column(
-        String,
-        ForeignKey("users.id"),
-        nullable=False
-    )
-
-    title = Column(
-        String,
-        nullable=False
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship(
         "User",
@@ -69,28 +43,13 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(String, primary_key=True)
+    course_id = Column(String, ForeignKey("courses.id"), nullable=False)
 
-    course_id = Column(
-        String,
-        ForeignKey("courses.id"),
-        nullable=False
-    )
-
-    filename = Column(
-        String,
-        nullable=False
-    )
-
-    pages = Column(Integer)
-
-    chunks = Column(Integer)
-
-    file_path = Column(Text)
-
-    status = Column(
-        String,
-        default="uploaded"
-    )
+    filename = Column(String, nullable=False)
+    pages = Column(Integer, default=0)
+    chunks = Column(Integer, default=0)
+    file_path = Column(String, nullable=False)
+    status = Column(String, default="processing")
 
     created_at = Column(
         DateTime,
@@ -106,7 +65,10 @@ class Document(Base):
 class LearningProgress(Base):
     __tablename__ = "learning_progress"
 
-    id = Column(String, primary_key=True)
+    id = Column(
+        String,
+        primary_key=True
+    )
 
     user_id = Column(
         String,
@@ -120,19 +82,44 @@ class LearningProgress(Base):
         nullable=False
     )
 
+    topic = Column(
+        String,
+        nullable=False
+    )
+
     concept = Column(
         String,
         nullable=False
     )
 
+    attempts = Column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
+    correct = Column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
+    incorrect = Column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
     mastery = Column(
         Integer,
-        default=0
+        default=0,
+        nullable=False
     )
 
     status = Column(
         String,
-        default="learning"
+        default="learning",
+        nullable=False
     )
 
     updated_at = Column(

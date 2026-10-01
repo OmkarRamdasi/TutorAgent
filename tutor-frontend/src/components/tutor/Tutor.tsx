@@ -1,21 +1,25 @@
+import { MessageCircle } from "lucide-react";
+import { toast } from "sonner";
+
 import { useAuth } from "../../context/AuthContext";
 import { useCourses } from "../../context/CourseContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useTutor } from "../../context/TutorContext";
-import { toast } from "sonner";
-
+import { TutorSkeleton, InlineError } from "../ui/Skeleton";
+import { useParams } from "react-router-dom";
 import TutorResponse from "./TutorResponse";
 
 export default function Tutor() {
   const { user } = useAuth();
   const { courses } = useCourses();
   const { darkMode } = useTheme();
-
+  const { courseId } = useParams();
   const {
     question,
     setQuestion,
     askingTutor,
     askTutor,
+    tutorError,
   } = useTutor();
 
   const handleAskTutor = async () => {
@@ -28,122 +32,93 @@ export default function Tutor() {
       return;
     }
 
-    if (courses.length === 0) {
-      toast.warning(
-        "Please upload a course first."
-      );
+    const selectedCourseId = courseId || courses[0]?.id;
+
+    if (!selectedCourseId) {
+      toast.warning("Please upload a course first.");
       return;
     }
 
     try {
-      const courseId = courses[0].id;
-
       await askTutor(
-        question,
-        courseId
+        question.trim(),
+        selectedCourseId
       );
     } catch (error) {
-      console.error(
-        "Tutor failed:",
-        error
-      );
-
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Tutor failed."
-      );
+      console.error("Tutor failed:", error);
+      toast.error(error instanceof Error ? error.message : "Tutor failed.");
     }
   };
 
+  if (askingTutor) {
+    return <TutorSkeleton />;
+  }
+
   return (
     <div
-      className={`mt-8 rounded-2xl border p-6 transition-colors duration-300 ${
-        darkMode
-          ? "border-white/10 bg-white/[0.02]"
-          : "border-[var(--learnai-primary-soft)] bg-[var(--learnai-surface)] shadow-sm"
-      }`}
+      className={`mt-8 rounded-2xl border p-6 transition-colors duration-300 ${darkMode
+        ? "border-white/10 bg-white/[0.02]"
+        : "border-(--learnai-primary-soft) bg-(--learnai-surface) shadow-sm"
+        }`}
     >
-      {/* HEADER */}
-
       <div className="flex items-center gap-3">
-
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+          className={
             darkMode
-              ? "bg-indigo-500/10"
-              : "bg-[var(--learnai-primary-soft)]"
-          }`}
+              ? "flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white"
+              : "flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 text-black"
+          }
         >
-          <span className="text-xl">
-            🤖
-          </span>
+          <MessageCircle size={19} strokeWidth={1.7} />
         </div>
 
         <div>
-          <h2
-            className={`text-2xl font-bold ${
-              darkMode
-                ? "text-white"
-                : "text-[var(--learnai-primary)]"
-            }`}
-          >
+          <h2 className={darkMode ? "text-2xl font-bold text-white" : "text-2xl font-bold text-black"}>
             LearnAI Tutor
           </h2>
-
-          <p
-            className={`mt-1 text-sm ${
-              darkMode
-                ? "text-zinc-400"
-                : "text-[var(--learnai-primary)]/60"
-            }`}
-          >
-            Ask me anything about your
-            course material.
+          <p className="mt-1 text-sm text-zinc-500">
+            Ask me anything about your course material.
           </p>
         </div>
-
       </div>
 
-      {/* ASK */}
-
-      <div className="mt-5 flex gap-3">
-
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <input
           type="text"
           value={question}
-          onChange={(e) =>
-            setQuestion(e.target.value)
-          }
+          onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
-              handleAskTutor();
+              void handleAskTutor();
             }
           }}
           placeholder="What do you want to learn?"
-          className={`flex-1 rounded-xl border px-4 py-3 text-sm outline-none transition ${
+          className={
             darkMode
-              ? "border-zinc-700 bg-zinc-800 text-white placeholder:text-zinc-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-              : "border-[var(--learnai-primary-soft)] bg-[var(--learnai-bg)] text-[var(--learnai-primary)] placeholder:text-[var(--learnai-primary)]/40 focus:border-[var(--learnai-primary)] focus:ring-2 focus:ring-[var(--learnai-primary)]/10"
-          }`}
+              ? "flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-white focus:ring-2 focus:ring-white/10"
+              : "flex-1 rounded-xl border border-(--learnai-primary-soft) bg-(--learnai-bg) px-4 py-3 text-sm text-black outline-none placeholder:text-zinc-400 focus:border-black focus:ring-2 focus:ring-black/10"
+          }
         />
 
         <button
           type="button"
-          onClick={handleAskTutor}
+          onClick={() => void handleAskTutor()}
           disabled={askingTutor}
-          className={`rounded-xl px-6 py-3 font-medium text-white transition ${
+          className={
             darkMode
-              ? "bg-indigo-600 hover:bg-indigo-500"
-              : "bg-[var(--learnai-accent)] hover:opacity-90"
-          } disabled:cursor-not-allowed disabled:opacity-50`}
+              ? "rounded-xl bg-white px-6 py-3 font-medium text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              : "rounded-xl bg-black px-6 py-3 font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+          }
         >
-          {askingTutor
-            ? "Thinking..."
-            : "Ask Tutor"}
+          Ask Tutor
         </button>
-
       </div>
+
+      {tutorError && (
+        <div className="mt-5">
+          <InlineError message={tutorError} />
+        </div>
+      )}
 
       <TutorResponse />
     </div>

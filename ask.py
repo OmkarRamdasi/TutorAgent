@@ -8,6 +8,9 @@ import chromadb
 from dotenv import load_dotenv
 from google import genai
 from pydantic import BaseModel, Field
+from database import SessionLocal
+from models import LearningProgress
+from retrieve import retrieve_chunks
 
 
 # ============================================================
@@ -339,6 +342,47 @@ def calculate_mastery(topic, concept):
     mastery = correct / attempts
 
     return mastery
+
+def get_concept_progress_db(
+    user_id,
+    course_id,
+    topic,
+    concept
+):
+    """
+    Read learning progress for a specific
+    user + course + topic + concept from PostgreSQL.
+    """
+
+    db = SessionLocal()
+
+    try:
+        progress = (
+            db.query(LearningProgress)
+            .filter(
+                LearningProgress.user_id == user_id,
+                LearningProgress.course_id == course_id,
+                LearningProgress.topic == topic,
+                LearningProgress.concept == concept
+            )
+            .first()
+        )
+
+        if progress is None:
+            return None
+
+        return {
+            "topic": progress.topic,
+            "concept": progress.concept,
+            "attempts": progress.attempts,
+            "correct": progress.correct,
+            "incorrect": progress.incorrect,
+            "mastery": progress.mastery,
+            "status": progress.status
+        }
+
+    finally:
+        db.close()
 
 
 def get_learning_state(mastery):
@@ -1650,7 +1694,8 @@ def agent(
 # ============================================================
 def ask_tutor(
     question,
-    course_id
+    course_id,
+    user_id
 ):
     """
     API-friendly tutor function.
@@ -1680,17 +1725,19 @@ def ask_tutor(
             "Could not identify the concept."
         )
 
-    # 3. Read student memory
-    concept_history = get_concept_history(
+   # 3. Read student memory from PostgreSQL
+    concept_history = get_concept_progress_db(
+        user_id,
+        course_id,
         concept_identification.topic,
         concept_identification.concept
     )
 
-    # 4. Calculate mastery
-    mastery = calculate_mastery(
-        concept_identification.topic,
-        concept_identification.concept
-    )
+# 4. Calculate mastery from PostgreSQL
+    if concept_history is None:
+        mastery = 0.0
+    else:
+        mastery = concept_history["mastery"] / 100.0
 
     # 5. Determine learning state
     learning_state = get_learning_state(
@@ -1714,6 +1761,92 @@ def ask_tutor(
 
     return tutor
 
+# ============================================================
+# Summary API
+# ============================================================
+def generate_course_summary(course_id):
+    """
+    Generate an AI summary for a course.
+    """
+
+    # --------------------------------------------------------
+    # Retrieve course content
+    # --------------------------------------------------------
+
+    results = retrieve_chunks(
+        "Identify the main topics and important concepts covered in this course",
+        course_id,
+        top_k=10
+    )
+
+    documents = results.get(
+        "documents",
+        [[]]
+    )[0]
+
+    if not documents:
+        raise ValueError(
+            "No course content found for this course."
+        )
+
+    # --------------------------------------------------------
+    # Combine retrieved chunks
+    # --------------------------------------------------------
+
+    context = "\n\n".join(
+        documents
+    )
+
+    # --------------------------------------------------------
+    # Generate summary
+    # --------------------------------------------------------
+
+    prompt = f"""
+You are an AI learning tutor.
+
+Create a clear and structured summary of the
+following course material.
+
+COURSE MATERIAL:
+{context}
+
+Structure the response using:
+
+## Course Overview
+
+Give a short overview of what the material covers.
+
+## Main Topics
+
+List the major topics covered.
+
+## Important Concepts
+
+Explain the most important concepts briefly.
+
+## Key Takeaways
+
+List the most important things a learner should remember.
+
+Rules:
+- Use only information present in the course material.
+- Do not invent topics or concepts.
+- Keep the explanation learner-friendly.
+- Use clear headings and bullet points.
+- Focus on important information rather than minor details.
+"""
+
+    response = client.models.generate_content(
+        model=PRIMARY_MODEL,
+        contents=prompt
+    )
+
+    if not response or not response.text:
+        raise ValueError(
+            "AI did not return a summary."
+        )
+
+    return response.text
 # ============================================================
 # MAIN PROGRAM
 # ============================================================
