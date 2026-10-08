@@ -3,10 +3,10 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
-  FileText,
   GraduationCap,
   MessageCircle,
   Sparkles,
+  ChevronDown
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -16,7 +16,7 @@ import { useCourses } from "../../context/CourseContext";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { LibraryDetailSkeleton, InlineError } from "../ui/Skeleton";
-
+import { useProgress } from "../../context/ProgressContext";
 export default function LibraryDetail() {
   const { courseId } = useParams();
   const navigate = useNavigate();
@@ -30,8 +30,16 @@ export default function LibraryDetail() {
     summaryLoading,
     summaryError,
   } = useCourses();
+
+  const {
+    progress,
+    progressLoading,
+    progressError,
+    fetchProgress,
+  } = useProgress();
   const { darkMode } = useTheme();
   const [summary, setSummary] = useState<string | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(true);
 
   useEffect(() => {
     if (!courseId || !user) {
@@ -58,6 +66,16 @@ export default function LibraryDetail() {
     (item) => item.id === courseId
   );
 
+  useEffect(() => {
+    if (!user || !courseId) {
+      return;
+    }
+
+    void fetchProgress(user, courseId);
+  }, [user, courseId, fetchProgress]);
+
+
+  console.log("COURSE PROGRESS:", progress);
   if (loadingCourses) {
     return (
       <div className={darkMode ? "min-h-screen bg-zinc-950 text-white" : "min-h-screen bg-(--learnai-bg) text-black"}>
@@ -175,90 +193,22 @@ export default function LibraryDetail() {
           </div>
         </div>
 
-        {/* YOUR MATERIAL */}
+        {/* AI SUMMARY */}
 
-        {/* <section
+        <section
           className={
             darkMode
-              ? "rounded-2xl border border-white/10 bg-white/[0.02] p-6"
-              : "rounded-2xl border border-(--learnai-primary-soft) bg-white p-6"
+              ? "mt-5 rounded-2xl border border-white/10 bg-white/[0.02]"
+              : "mt-5 rounded-2xl border border-(--learnai-primary-soft) bg-white"
           }
         >
-          <div className="mb-5">
-            <p
-              className={
-                darkMode
-                  ? "text-xs font-medium uppercase tracking-wide text-zinc-500"
-                  : "text-xs font-medium uppercase tracking-wide text-zinc-500"
-              }
-            >
-              01
-            </p>
+          {/* SUMMARY HEADER */}
 
-            <h2
-              className={
-                darkMode
-                  ? "mt-1 text-base font-semibold text-white"
-                  : "mt-1 text-base font-semibold text-black"
-              }
-            >
-              Your Material
-            </h2>
-
-            <p className="mt-1 text-sm text-zinc-500">
-              Material uploaded to this learning library.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            {course.documents?.map((document: any) => (
-              <div
-                key={document.id}
-                className={
-                  darkMode
-                    ? "flex items-center gap-3 rounded-xl bg-white/5 px-4 py-3"
-                    : "flex items-center gap-3 rounded-xl bg-[#F5F5F5] px-4 py-3"
-                }
-              >
-                <FileText
-                  size={18}
-                  strokeWidth={1.7}
-                  className={
-                    darkMode
-                      ? "shrink-0 text-zinc-300"
-                      : "shrink-0 text-black"
-                  }
-                />
-
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={
-                      darkMode
-                        ? "truncate text-sm text-zinc-200"
-                        : "truncate text-sm text-zinc-800"
-                    }
-                  >
-                    {document.filename}
-                  </p>
-
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {document.pages
-                      ? `${document.pages} pages`
-                      : "Document"}
-                  </p>
-                </div>
-
-                <span className="shrink-0 text-xs text-zinc-500">
-                  {document.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section> */}
-
-        {/* AI SUMMARY */}
-        <section>
-          <div className="flex items-start gap-4">
+          <button
+            type="button"
+            onClick={() => setSummaryOpen((prev) => !prev)}
+            className="flex w-full items-center gap-4 p-6 text-left"
+          >
             <div
               className={
                 darkMode
@@ -284,58 +234,136 @@ export default function LibraryDetail() {
                 AI Summary
               </h2>
 
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
-                Here's a quick overview of your study material to give
-                you context before you start learning.
+              <p className="mt-1 text-sm text-zinc-500">
+                Get a clear overview of your study material.
               </p>
+            </div>
 
-              {summaryLoading && (
-                <div
-                  className={
-                    darkMode
-                      ? "mt-5 rounded-xl bg-white/5 p-5"
-                      : "mt-5 rounded-xl bg-[#F5F5F5] p-5"
-                  }
-                >
-                  <div className="space-y-3 animate-pulse">
-                    <div className="h-4 w-40 rounded bg-zinc-300/40" />
-                    <div className="h-3 w-full rounded bg-zinc-300/30" />
-                    <div className="h-3 w-5/6 rounded bg-zinc-300/30" />
-                    <div className="h-3 w-4/6 rounded bg-zinc-300/30" />
+            <ChevronDown
+              size={18}
+              strokeWidth={1.7}
+              className={
+                darkMode
+                  ? `shrink-0 text-zinc-400 transition-transform duration-200 ${summaryOpen ? "rotate-180" : ""
+                  }`
+                  : `shrink-0 text-zinc-500 transition-transform duration-200 ${summaryOpen ? "rotate-180" : ""
+                  }`
+              }
+            />
+          </button>
+
+          {/* SUMMARY CONTENT */}
+
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${summaryOpen ? "max-h-[660px] opacity-100" : "max-h-0 opacity-0"
+              }`}
+          >
+            <div className="border-t border-(--learnai-primary-soft) dark:border-white/10">
+              <div
+                className={
+                  darkMode
+                    ? "scrollbar-dark h-[600px] overflow-y-auto px-6 py-6"
+                    : "scrollbar-light h-[600px] overflow-y-auto px-6 py-6"
+                }
+              >
+                {summaryLoading && (
+                  <div className="space-y-4">
+                    <div className="h-5 w-48 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                    <div className="h-4 w-full animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                    <div className="h-4 w-5/6 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+                    <div className="h-4 w-4/6 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
                   </div>
-                </div>
-              )}
+                )}
 
-              {summaryError && (
-                <div className="mt-5">
-                  <InlineError
-                    title="Summary couldn't be loaded"
-                    message={summaryError}
-                  />
-                </div>
-              )}
+                {summaryError && (
+                  <p className="text-sm text-zinc-500">
+                    {summaryError}
+                  </p>
+                )}
 
-              {summary && !summaryLoading && !summaryError && (
-                <div
-                  className={
-                    darkMode
-                      ? "mt-5 rounded-xl bg-white/5 p-5 text-sm leading-7 text-zinc-300 whitespace-pre-wrap"
-                      : "mt-5 rounded-xl bg-[#F5F5F5] p-5 text-sm leading-7 text-zinc-700 whitespace-pre-wrap"
-                  }
-                >
+                {!summaryLoading && !summaryError && summary && (
                   <div
                     className={
                       darkMode
-                        ? "prose prose-invert max-w-none prose-headings:font-semibold prose-headings:text-white prose-p:text-zinc-300 prose-p:leading-7 prose-li:text-zinc-300 prose-strong:text-white"
-                        : "prose max-w-none prose-headings:font-semibold prose-headings:text-black prose-p:text-zinc-700 prose-p:leading-7 prose-li:text-zinc-700 prose-strong:text-black"
+                        ? "text-[15px] leading-7 text-zinc-300"
+                        : "text-[15px] leading-7 text-zinc-700"
                     }
                   >
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({ children }) => (
+                          <h1
+                            className={
+                              darkMode
+                                ? "mb-5 text-2xl font-semibold text-white"
+                                : "mb-5 text-2xl font-semibold text-black"
+                            }
+                          >
+                            {children}
+                          </h1>
+                        ),
+
+                        h2: ({ children }) => (
+                          <h2
+                            className={
+                              darkMode
+                                ? "mb-4 mt-8 text-xl font-semibold text-white"
+                                : "mb-4 mt-8 text-xl font-semibold text-black"
+                            }
+                          >
+                            {children}
+                          </h2>
+                        ),
+
+                        h3: ({ children }) => (
+                          <h3
+                            className={
+                              darkMode
+                                ? "mb-3 mt-6 text-lg font-semibold text-zinc-100"
+                                : "mb-3 mt-6 text-lg font-semibold text-zinc-900"
+                            }
+                          >
+                            {children}
+                          </h3>
+                        ),
+
+                        p: ({ children }) => (
+                          <p className="mb-4">
+                            {children}
+                          </p>
+                        ),
+
+                        ul: ({ children }) => (
+                          <ul className="mb-5 list-disc space-y-2 pl-6">
+                            {children}
+                          </ul>
+                        ),
+
+                        ol: ({ children }) => (
+                          <ol className="mb-5 list-decimal space-y-2 pl-6">
+                            {children}
+                          </ol>
+                        ),
+
+                        strong: ({ children }) => (
+                          <strong
+                            className={
+                              darkMode
+                                ? "font-semibold text-white"
+                                : "font-semibold text-black"
+                            }
+                          >
+                            {children}
+                          </strong>
+                        ),
+                      }}
+                    >
                       {summary}
                     </ReactMarkdown>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </section>
@@ -396,7 +424,6 @@ export default function LibraryDetail() {
             </div>
           </div>
         </section>
-
         {/* LEARNING JOURNEY */}
 
         <section
@@ -407,6 +434,8 @@ export default function LibraryDetail() {
           }
         >
           <div className="flex items-start gap-4">
+            {/* ICON */}
+
             <div
               className={
                 darkMode
@@ -414,13 +443,21 @@ export default function LibraryDetail() {
                   : "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#F5F5F5] text-black"
               }
             >
-              <GraduationCap size={19} strokeWidth={1.7} />
+              <GraduationCap
+                size={19}
+                strokeWidth={1.7}
+              />
             </div>
 
             <div className="min-w-0 flex-1">
+
+              {/* SECTION NUMBER */}
+
               <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
                 04
               </p>
+
+              {/* TITLE */}
 
               <h2
                 className={
@@ -432,47 +469,283 @@ export default function LibraryDetail() {
                 Learning Journey
               </h2>
 
+              {/* DESCRIPTION */}
+
               <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-500">
                 Learn step by step, practice what you understand,
                 and track your progress as you go.
               </p>
 
-              <div
-                className={
-                  darkMode
-                    ? "mt-5 rounded-xl bg-white/5 p-4"
-                    : "mt-5 rounded-xl bg-[#F5F5F5] p-4"
-                }
-              >
-                <p
+              {/* PROGRESS CONTENT */}
+
+              {progressLoading ? (
+                <div
                   className={
                     darkMode
-                      ? "text-sm font-medium text-zinc-300"
-                      : "text-sm font-medium text-zinc-700"
+                      ? "mt-5 rounded-xl bg-white/5 p-5"
+                      : "mt-5 rounded-xl bg-[#F5F5F5] p-5"
                   }
                 >
-                  Your learning journey hasn't started yet.
-                </p>
+                  <div className="space-y-4">
+                    <div className="h-4 w-32 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
 
-                <p className="mt-1 text-xs text-zinc-500">
-                  Start learning after reviewing your material.
-                </p>
-              </div>
+                    <div className="h-8 w-20 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
 
-              <button
-                type="button"
-                className={
-                  darkMode
-                    ? "mt-5 flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-zinc-200"
-                    : "mt-5 flex items-center gap-2 rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800"
-                }
-              >
-                Start Learning
-                <ArrowRight size={15} />
-              </button>
+                    <div className="h-2 w-full animate-pulse rounded-full bg-zinc-200 dark:bg-zinc-800" />
+                  </div>
+                </div>
+              ) : progressError ? (
+                <div
+                  className={
+                    darkMode
+                      ? "mt-5 rounded-xl bg-white/5 p-4"
+                      : "mt-5 rounded-xl bg-[#F5F5F5] p-4"
+                  }
+                >
+                  <p
+                    className={
+                      darkMode
+                        ? "text-sm text-zinc-400"
+                        : "text-sm text-zinc-600"
+                    }
+                  >
+                    {progressError}
+                  </p>
+                </div>
+              ) : progress.length === 0 ? (
+                <div
+                  className={
+                    darkMode
+                      ? "mt-5 rounded-xl bg-white/5 p-4"
+                      : "mt-5 rounded-xl bg-[#F5F5F5] p-4"
+                  }
+                >
+                  <p
+                    className={
+                      darkMode
+                        ? "text-sm font-medium text-zinc-300"
+                        : "text-sm font-medium text-zinc-700"
+                    }
+                  >
+                    Your learning journey hasn't started yet.
+                  </p>
+
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Start practicing with the AI Tutor to build your progress.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* OVERALL PROGRESS */}
+
+                  <div
+                    className={
+                      darkMode
+                        ? "mt-5 rounded-xl bg-white/5 p-5"
+                        : "mt-5 rounded-xl bg-[#F5F5F5] p-5"
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                          Overall Progress
+                        </p>
+
+                        <p
+                          className={
+                            darkMode
+                              ? "mt-2 text-3xl font-semibold text-white"
+                              : "mt-2 text-3xl font-semibold text-black"
+                          }
+                        >
+                          {Math.round(
+                            progress.reduce(
+                              (total, item) =>
+                                total + item.mastery,
+                              0
+                            ) / progress.length
+                          )}
+                          %
+                        </p>
+
+                        <p className="mt-1 text-xs text-zinc-500">
+                          Average mastery
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <p
+                          className={
+                            darkMode
+                              ? "text-lg font-semibold text-white"
+                              : "text-lg font-semibold text-black"
+                          }
+                        >
+                          {progress.length}
+                        </p>
+
+                        <p className="text-xs text-zinc-500">
+                          {progress.length === 1
+                            ? "Concept"
+                            : "Concepts"}
+                        </p>
+
+                        <p
+                          className={
+                            darkMode
+                              ? "mt-3 text-lg font-semibold text-white"
+                              : "mt-3 text-lg font-semibold text-black"
+                          }
+                        >
+                          {progress.reduce(
+                            (total, item) =>
+                              total + item.attempts,
+                            0
+                          )}
+                        </p>
+
+                        <p className="text-xs text-zinc-500">
+                          Attempts
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* OVERALL PROGRESS BAR */}
+
+                    <div className="mt-5">
+                      <div
+                        className={
+                          darkMode
+                            ? "h-2 overflow-hidden rounded-full bg-zinc-800"
+                            : "h-2 overflow-hidden rounded-full bg-zinc-200"
+                        }
+                      >
+                        <div
+                          className={
+                            darkMode
+                              ? "h-full rounded-full bg-white transition-all duration-500"
+                              : "h-full rounded-full bg-black transition-all duration-500"
+                          }
+                          style={{
+                            width: `${Math.round(
+                              progress.reduce(
+                                (total, item) =>
+                                  total + item.mastery,
+                                0
+                              ) / progress.length
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CONCEPT PROGRESS */}
+
+                  <div className="mt-6">
+                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      Concepts
+                    </p>
+
+                    <div className="mt-3 space-y-3">
+                      {progress.map((item) => (
+                        <div
+                          key={`${item.topic}-${item.concept}`}
+                          className={
+                            darkMode
+                              ? "rounded-xl border border-white/10 p-4"
+                              : "rounded-xl border border-(--learnai-primary-soft) p-4"
+                          }
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                              <p
+                                className={
+                                  darkMode
+                                    ? "text-xs text-zinc-500"
+                                    : "text-xs text-zinc-500"
+                                }
+                              >
+                                {item.topic}
+                              </p>
+
+                              <p
+                                className={
+                                  darkMode
+                                    ? "mt-1 text-sm font-medium text-white"
+                                    : "mt-1 text-sm font-medium text-black"
+                                }
+                              >
+                                {item.concept}
+                              </p>
+                            </div>
+
+                            <div className="shrink-0 text-right">
+                              <p
+                                className={
+                                  darkMode
+                                    ? "text-sm font-semibold text-white"
+                                    : "text-sm font-semibold text-black"
+                                }
+                              >
+                                {item.mastery}%
+                              </p>
+
+                              <p className="mt-1 text-xs capitalize text-zinc-500">
+                                {item.status}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* CONCEPT PROGRESS BAR */}
+
+                          <div
+                            className={
+                              darkMode
+                                ? "mt-4 h-2 overflow-hidden rounded-full bg-zinc-800"
+                                : "mt-4 h-2 overflow-hidden rounded-full bg-zinc-200"
+                            }
+                          >
+                            <div
+                              className={
+                                darkMode
+                                  ? "h-full rounded-full bg-white transition-all duration-500"
+                                  : "h-full rounded-full bg-black transition-all duration-500"
+                              }
+                              style={{
+                                width: `${item.mastery}%`,
+                              }}
+                            />
+                          </div>
+
+                          {/* ATTEMPTS */}
+
+                          <div className="mt-3 flex gap-4 text-xs text-zinc-500">
+                            <span>
+                              {item.attempts}{" "}
+                              {item.attempts === 1
+                                ? "attempt"
+                                : "attempts"}
+                            </span>
+
+                            <span>
+                              {item.correct} correct
+                            </span>
+
+                            <span>
+                              {item.incorrect} incorrect
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </section>
+
       </main>
     </div>
   );

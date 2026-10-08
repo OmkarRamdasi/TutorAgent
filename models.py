@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer,Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -25,7 +25,16 @@ class Course(Base):
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+
+    summary = Column(
+        Text,
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
 
     user = relationship(
         "User",

@@ -22,6 +22,7 @@ import CourseLibrary from "./components/courses/CourseLibrary";
 import Tutor from "./components/tutor/Tutor";
 import LibraryDetail from "./components/courses/LibraryDetail";
 import AuthLoadingScreen from "./components/ui/AuthLoadingScreen";
+import AuthenticatedLayout from "./components/layout/AuthenticatedLayout";
 
 function Dashboard() {
   const { darkMode } = useTheme();
@@ -40,17 +41,9 @@ function Dashboard() {
         closeButton
       />
 
-      {/* HEADER */}
-
-      <Header />
-
       {/* BODY */}
 
       <div className="flex">
-        {/* SIDEBAR */}
-
-        <Sidebar />
-
         {/* MAIN CONTENT */}
 
         <main className="flex-1">
@@ -97,7 +90,6 @@ function Dashboard() {
 
             {/* ASK TUTOR */}
 
-            <Tutor />
 
             {/* LIBRARY */}
 
@@ -536,11 +528,8 @@ function TutorPage() {
         : "bg-(--learnai-background) text-(--learnai-primary)"
         }`}
     >
-      <Header />
-
+   
       <div className="flex">
-        <Sidebar />
-
         <main className="flex-1">
           <div className="mx-auto max-w-5xl px-6 py-8">
             <button
@@ -574,16 +563,19 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/app" element={<Dashboard />} />
+      <Route element={<AuthenticatedLayout />}>
+        <Route path="/app" element={<Dashboard />} />
 
-      <Route
-        path="/app/library/:courseId"
-        element={<LibraryDetail />}
-      />
-      <Route
-        path="/app/tutor/:courseId"
-        element={<TutorPage />}
-      />
+        <Route
+          path="/app/library/:courseId"
+          element={<LibraryDetail />}
+        />
+
+        <Route
+          path="/app/tutor/:courseId"
+          element={<TutorPage />}
+        />
+      </Route>
 
       <Route
         path="*"

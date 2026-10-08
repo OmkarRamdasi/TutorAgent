@@ -658,9 +658,87 @@ def generate_course_summary(
                 detail="Course not found"
             )
 
+        # ----------------------------------------------------
+        # Return saved summary if it already exists
+        # ----------------------------------------------------
+
+        if course.summary:
+
+            return {
+                "course_id": request.course_id,
+                "summary": course.summary
+            }
+
     finally:
 
         db.close()
+
+    # --------------------------------------------------------
+    # Generate summary only if it doesn't exist
+    # --------------------------------------------------------
+
+    try:
+
+        from ask import generate_course_summary
+
+        summary = generate_course_summary(
+            request.course_id
+        )
+
+    except Exception as e:
+
+        import traceback
+
+        print("\n========== SUMMARY ERROR ==========")
+        print("Error:", repr(e))
+        traceback.print_exc()
+        print("==================================\n")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate course summary."
+        )
+
+    # --------------------------------------------------------
+    # Save generated summary to database
+    # --------------------------------------------------------
+
+    db = SessionLocal()
+
+    try:
+
+        course = (
+            db.query(Course)
+            .filter(
+                Course.id == request.course_id,
+                Course.user_id == user.id
+            )
+            .first()
+        )
+
+        if not course:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Course not found"
+            )
+
+        course.summary = summary
+
+        db.commit()
+
+    finally:
+
+        db.close()
+
+    # --------------------------------------------------------
+    # Return summary
+    # --------------------------------------------------------
+
+    return {
+        "course_id": request.course_id,
+        "summary": summary
+    }
 
     # --------------------------------------------------------
     # Generate summary
@@ -1015,3 +1093,122 @@ def evaluate_student_answer(
                 "evaluate answer."
             )
         )
+        
+# ============================================================
+# GET COURSE PROGRESS
+# ============================================================
+      
+@app.get("/progress/{course_id}")
+def get_course_progress(
+    course_id: str,
+    current_user=Depends(
+        get_current_user
+    )
+):
+
+    user = get_or_create_user(
+        current_user
+    )
+
+    db = SessionLocal()
+
+    try:
+
+        # ----------------------------------------------------
+        # Verify course belongs to logged-in user
+        # ----------------------------------------------------
+
+        course = (
+            db.query(Course)
+            .filter(
+                Course.id == course_id,
+                Course.user_id == user.id
+            )
+            .first()
+        )
+
+        if not course:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Course not found"
+            )
+
+        # ----------------------------------------------------
+        # Fetch learning progress
+        # ----------------------------------------------------
+
+        progress_records = (
+            db.query(LearningProgress)
+            .filter(
+                LearningProgress.course_id
+                == course_id,
+
+                LearningProgress.user_id
+                == user.id
+            )
+            .order_by(
+                LearningProgress.updated_at.desc()
+            )
+            .all()
+        )
+
+        # ----------------------------------------------------
+        # Return progress
+        # ----------------------------------------------------
+
+        return {
+            "course_id": course_id,
+
+            "progress": [
+                {
+                    "topic": progress.topic,
+
+                    "concept": progress.concept,
+
+                    "attempts": progress.attempts,
+
+                    "correct": progress.correct,
+
+                    "incorrect": progress.incorrect,
+
+                    "mastery": progress.mastery,
+
+                    "status": progress.status
+                }
+
+                for progress in progress_records
+            ]
+        }
+
+    except HTTPException:
+
+        raise
+
+    except Exception as e:
+
+        import traceback
+
+        print(
+            "\n========== PROGRESS ERROR =========="
+        )
+
+        print(
+            "Error:",
+            repr(e)
+        )
+
+        traceback.print_exc()
+
+        print(
+            "====================================\n"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch course progress."
+        )
+
+    finally:
+
+        db.close()

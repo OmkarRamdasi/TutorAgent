@@ -8,6 +8,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { CourseProvider } from "./context/CourseContext";
 import { TutorProvider } from "./context/TutorContext";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
+import { ProgressProvider } from "./context/ProgressContext.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -17,7 +18,10 @@ createRoot(document.getElementById("root")!).render(
           <AuthProvider>
             <CourseProvider>
               <TutorProvider>
-                <App />
+                <ProgressProvider>
+                  <App />
+                </ProgressProvider>
+                
               </TutorProvider>
             </CourseProvider>
           </AuthProvider>
