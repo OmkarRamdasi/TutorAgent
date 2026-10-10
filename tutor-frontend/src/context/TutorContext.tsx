@@ -53,7 +53,9 @@ interface TutorContextType {
 
   evaluateAnswer: (
     studentAnswer: string,
-    courseId: string
+    courseId: string,
+    questionOverride?: TutorResponse,
+    practiceQuestionId?: string
   ) => Promise<Evaluation>;
 }
 
@@ -175,101 +177,81 @@ export function TutorProvider({
 
   const evaluateAnswer = async (
     studentAnswer: string,
-    courseId: string
+    courseId: string,
+    questionOverride?: TutorResponse,
+    practiceQuestionId?: string
   ): Promise<Evaluation> => {
-
     if (!user) {
-
-      throw new Error(
-        "Please log in first."
-      );
+      throw new Error("Please log in first.");
     }
 
-    if (!tutorResponse) {
+    const activeQuestion = questionOverride ?? tutorResponse;
 
-      throw new Error(
-        "No quiz question available."
-      );
+    if (!activeQuestion) {
+      throw new Error("No quiz question available.");
     }
 
     setEvaluatingAnswer(true);
     setEvaluationError("");
 
     try {
+      const token = await user.getIdToken();
 
-      const token =
-        await user.getIdToken();
+      const isPracticeQuestion = Boolean(
+        practiceQuestionId?.trim()
+      );
+
+      const payload = {
+        course_id: courseId,
+        topic: activeQuestion.topic,
+        concept: activeQuestion.concept,
+        quiz_question: activeQuestion.quiz_question,
+        student_answer: studentAnswer.trim(),
+
+        // Practice answers are loaded securely by the backend.
+        ...(isPracticeQuestion
+          ? {
+            practice_question_id: practiceQuestionId,
+          }
+          : {
+            expected_answer: activeQuestion.expected_answer,
+            quiz_explanation: activeQuestion.quiz_explanation,
+          }),
+      };
+
+      console.log("Evaluation request:", {
+        course_id: payload.course_id,
+        practice_question_id:
+          "practice_question_id" in payload
+            ? payload.practice_question_id
+            : null,
+        isPracticeQuestion,
+      });
 
       const response = await fetch(
         "http://localhost:8000/evaluate",
         {
           method: "POST",
-
           headers: {
             "Content-Type": "application/json",
-
-            Authorization:
-              `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
-
-          body: JSON.stringify({
-
-            // -----------------------------------------
-            // Course
-            // -----------------------------------------
-
-            course_id: courseId,
-
-            // -----------------------------------------
-            // Learning context
-            // -----------------------------------------
-
-            topic:
-              tutorResponse.topic,
-
-            concept:
-              tutorResponse.concept,
-
-            // -----------------------------------------
-            // Quiz
-            // -----------------------------------------
-
-            quiz_question:
-              tutorResponse.quiz_question,
-
-            expected_answer:
-              tutorResponse.expected_answer,
-
-            quiz_explanation:
-              tutorResponse.quiz_explanation,
-
-            // -----------------------------------------
-            // Student answer
-            // -----------------------------------------
-
-            student_answer:
-              studentAnswer,
-          }),
+          body: JSON.stringify(payload),
         }
       );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
-
         throw new Error(
-          data.detail ||
-          "Answer evaluation failed."
+          data.detail || "Answer evaluation failed."
         );
       }
 
       setEvaluation(data);
 
       return data;
-
     } catch (error) {
-
       const message =
         error instanceof Error
           ? error.message
@@ -278,12 +260,11 @@ export function TutorProvider({
       setEvaluationError(message);
 
       throw error;
-
     } finally {
-
       setEvaluatingAnswer(false);
     }
   };
+
 
   // ============================================================
   // CONTEXT

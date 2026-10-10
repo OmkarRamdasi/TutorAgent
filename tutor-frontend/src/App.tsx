@@ -1,8 +1,3 @@
-import { useState } from "react";
-import {
-  Routes, Route, Navigate, useNavigate,
-  useParams,
-} from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
@@ -10,19 +5,26 @@ import {
   Play,
   Sparkles,
 } from "lucide-react";
+import { useState } from "react";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { Toaster } from "sonner";
 
+import CourseLibrary from "./components/courses/CourseLibrary";
+import LibraryDetail from "./components/courses/LibraryDetail";
+import UploadCard from "./components/courses/UploadCard";
+import AuthenticatedLayout from "./components/layout/AuthenticatedLayout";
+import Tutor from "./components/tutor/Tutor";
+import AuthLoadingScreen from "./components/ui/AuthLoadingScreen";
 import { useAuth } from "./context/AuthContext";
 import { useTheme } from "./context/ThemeContext";
-
-import Header from "./components/layout/Header";
-import Sidebar from "./components/layout/Sidebar";
-import UploadCard from "./components/courses/UploadCard";
-import CourseLibrary from "./components/courses/CourseLibrary";
-import Tutor from "./components/tutor/Tutor";
-import LibraryDetail from "./components/courses/LibraryDetail";
-import AuthLoadingScreen from "./components/ui/AuthLoadingScreen";
-import AuthenticatedLayout from "./components/layout/AuthenticatedLayout";
+import Practice from "./components/tutor/Practice";
+import LearningJourney from "./components/courses/LearningJourney";
 
 function Dashboard() {
   const { darkMode } = useTheme();
@@ -34,12 +36,6 @@ function Dashboard() {
           : "min-h-screen bg-(--learnai-bg) text-(--learnai-primary) transition-colors duration-300"
       }
     >
-      <Toaster
-        position="bottom-right"
-        theme={darkMode ? "dark" : "light"}
-        richColors
-        closeButton
-      />
 
       {/* BODY */}
 
@@ -244,12 +240,6 @@ function AuthScreen() {
           : "min-h-screen bg-(--learnai-bg) text-(--learnai-primary)"
       }
     >
-      <Toaster
-        position="bottom-right"
-        theme={darkMode ? "dark" : "light"}
-        richColors
-        closeButton
-      />
 
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col">
 
@@ -528,7 +518,7 @@ function TutorPage() {
         : "bg-(--learnai-background) text-(--learnai-primary)"
         }`}
     >
-   
+
       <div className="flex">
         <main className="flex-1">
           <div className="mx-auto max-w-5xl px-6 py-8">
@@ -552,7 +542,7 @@ function TutorPage() {
 }
 function App() {
   const { user, loading } = useAuth();
-
+  const { darkMode } = useTheme();
   if (loading) {
     return <AuthLoadingScreen />;
   }
@@ -562,26 +552,44 @@ function App() {
   }
 
   return (
-    <Routes>
-      <Route element={<AuthenticatedLayout />}>
-        <Route path="/app" element={<Dashboard />} />
+    <>
+      <Routes>
+        <Route element={<AuthenticatedLayout />}>
+          <Route path="/app" element={<Dashboard />} />
+
+          <Route
+            path="/app/library/:courseId"
+            element={<LibraryDetail />}
+          />
+
+          <Route
+            path="/app/tutor/:courseId"
+            element={<TutorPage />}
+          />
+          <Route
+            path="/app/practice/:courseId"
+            element={<Practice />}
+          />
+
+          <Route
+            path="/app/progress/:courseId"
+            element={<LearningJourney />}
+          />
+        </Route>
 
         <Route
-          path="/app/library/:courseId"
-          element={<LibraryDetail />}
+          path="*"
+          element={<Navigate to="/app" replace />}
         />
 
-        <Route
-          path="/app/tutor/:courseId"
-          element={<TutorPage />}
-        />
-      </Route>
-
-      <Route
-        path="*"
-        element={<Navigate to="/app" replace />}
+      </Routes>
+      <Toaster
+        position="top-right"
+        theme={darkMode ? "dark" : "light"}
+        richColors
+        closeButton
       />
-    </Routes>
+    </>
   );
 }
 

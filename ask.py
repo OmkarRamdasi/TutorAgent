@@ -1761,6 +1761,84 @@ def ask_tutor(
 
     return tutor
 
+
+# ============================================================
+# Practice API
+# ============================================================
+def generate_practice_question(
+    course_id,
+    user_id
+):
+    """
+    Generate a standalone practice question
+    from the selected course material.
+    """
+
+    # 1. Retrieve course material
+    retrieved_chunks = retrieve(
+        "Identify an important concept suitable for a practice question",
+        course_id,
+        number_of_chunks=3
+    )
+
+    if not retrieved_chunks:
+        raise RuntimeError(
+            "No course material found for practice."
+        )
+
+    # 2. Identify the topic and concept
+    concept_identification = identify_concept(
+        "Identify an important concept to practice",
+        retrieved_chunks
+    )
+
+    if concept_identification is None:
+        raise RuntimeError(
+            "Could not identify a practice concept."
+        )
+
+    # 3. Read the student's learning history
+    concept_history = get_concept_progress_db(
+        user_id,
+        course_id,
+        concept_identification.topic,
+        concept_identification.concept
+    )
+
+    # 4. Calculate mastery
+    if concept_history is None:
+        mastery = 0.0
+    else:
+        mastery = (
+            concept_history["mastery"] / 100.0
+        )
+
+    # 5. Determine learning state
+    learning_state = get_learning_state(
+        mastery
+    )
+
+    # 6. Generate the question and supporting answer
+    practice = generate_tutor_response(
+        question=(
+            "Generate a standalone practice question "
+            "for the identified concept. Focus on "
+            "testing understanding rather than giving "
+            "the learner a new lesson."
+        ),
+        retrieved_chunks=retrieved_chunks,
+        concept_identification=concept_identification,
+        concept_history=concept_history,
+        mastery=mastery,
+        learning_state=learning_state
+    )
+
+    if practice is None:
+        raise RuntimeError(
+            "Could not generate a practice question."
+        )
+
+    return practice
 # ============================================================
 # Summary API
 # ============================================================

@@ -9,6 +9,7 @@ import { CourseProvider } from "./context/CourseContext";
 import { TutorProvider } from "./context/TutorContext";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { ProgressProvider } from "./context/ProgressContext.tsx";
+import { PracticeProvider } from "./context/PracticeContext.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -18,10 +19,12 @@ createRoot(document.getElementById("root")!).render(
           <AuthProvider>
             <CourseProvider>
               <TutorProvider>
-                <ProgressProvider>
-                  <App />
-                </ProgressProvider>
-                
+                <PracticeProvider>
+                  <ProgressProvider>
+                    <App />
+                  </ProgressProvider>
+                </PracticeProvider>
+
               </TutorProvider>
             </CourseProvider>
           </AuthProvider>

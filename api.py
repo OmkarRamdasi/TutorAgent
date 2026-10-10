@@ -12,14 +12,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from pathlib import Path
+from datetime import datetime
 import shutil
 import uuid
+from uuid import uuid4
 
+from models import PracticeQuestion
 from ingest import ingest_pdf
 
 from ask import (
     ask_tutor,
     evaluate_answer,
+    generate_practice_question,
     TutorResponse,
 )
 
@@ -56,9 +60,11 @@ class EvaluateRequest(BaseModel):
     topic: str
     concept: str
     quiz_question: str
-    expected_answer: str
-    quiz_explanation: str
     student_answer: str
+    
+    expected_answer: str | None = None
+    quiz_explanation: str | None = None
+    practice_question_id: str | None = None
 
 
 # ============================================================
@@ -922,202 +928,176 @@ def save_learning_progress(
 # EVALUATE STUDENT ANSWER
 # ============================================================
 
+
+
 @app.post("/evaluate")
 def evaluate_student_answer(
     request: EvaluateRequest,
-
-    current_user=Depends(
-        get_current_user
-    )
+    current_user=Depends(get_current_user)
 ):
-
-    user = get_or_create_user(
-        current_user
-    )
-
-    # --------------------------------------------------------
-    # Verify course belongs to logged-in user
-    # --------------------------------------------------------
-
+    user = get_or_create_user(current_user)
     db = SessionLocal()
 
     try:
-
+        # 1. Verify that the course belongs to the logged-in user.
         course = (
             db.query(Course)
             .filter(
-
-                Course.id
-                == request.course_id,
-
-                Course.user_id
-                == user.id
+                Course.id == request.course_id,
+                Course.user_id == user.id
             )
             .first()
         )
 
         if not course:
-
             raise HTTPException(
                 status_code=404,
-
                 detail="Course not found"
             )
 
-    finally:
+        # 2. Load the saved Practice question when an ID is provided.
+        practice_question = None
 
-        db.close()
-
-    try:
-
-        # ----------------------------------------------------
-        # Reconstruct TutorResponse
-        # ----------------------------------------------------
-
-        tutor_response = TutorResponse(
-
-            topic=request.topic,
-
-            concept=request.concept,
-
-            lesson="",
-
-            quiz_question=(
-                request.quiz_question
-            ),
-
-            expected_answer=(
-                request.expected_answer
-            ),
-
-            quiz_explanation=(
-                request.quiz_explanation
+        if request.practice_question_id:
+            practice_question = (
+                db.query(PracticeQuestion)
+                .filter(
+                    PracticeQuestion.id == request.practice_question_id,
+                    PracticeQuestion.course_id == request.course_id,
+                    PracticeQuestion.user_id == user.id
+                )
+                .first()
             )
-        )
 
-        # ----------------------------------------------------
-        # Evaluate answer using Gemini
-        # ----------------------------------------------------
+            if not practice_question:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Practice question not found"
+                )
 
+            if practice_question.status == "answered":
+                raise HTTPException(
+                    status_code=409,
+                    detail="This practice question has already been answered."
+                )
+
+            # Use the trusted answer stored in the database.
+            tutor_response = TutorResponse(
+                topic=practice_question.topic,
+                concept=practice_question.concept,
+                lesson="",
+                quiz_question=practice_question.quiz_question,
+                expected_answer=practice_question.expected_answer,
+                quiz_explanation=practice_question.quiz_explanation
+            )
+
+        else:
+            # 3. Preserve the normal AI Tutor evaluation flow.
+            if (
+                not request.expected_answer
+                or not request.quiz_explanation
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Missing expected answer or explanation. "
+                        "For Practice evaluations, provide a valid "
+                        "practice_question_id."
+                    )
+                )
+
+            tutor_response = TutorResponse(
+                topic=request.topic,
+                concept=request.concept,
+                lesson="",
+                quiz_question=request.quiz_question,
+                expected_answer=request.expected_answer,
+                quiz_explanation=request.quiz_explanation
+            )
+
+        # 4. Evaluate the student's answer.
         evaluation = evaluate_answer(
-
             tutor_response,
-
             request.student_answer
         )
 
         if evaluation is None:
-
             raise HTTPException(
                 status_code=500,
-
-                detail=(
-                    "Could not "
-                    "evaluate the answer."
-                )
+                detail="Could not evaluate the answer."
             )
 
-        # ----------------------------------------------------
-        # Save progress
-        # ----------------------------------------------------
-
+        # 5. Save Learning Journey progress.
         progress = save_learning_progress(
-
             user_id=user.id,
-
             course_id=request.course_id,
-
-            topic=request.topic,
-
-            concept=request.concept,
-
+            topic=tutor_response.topic,
+            concept=tutor_response.concept,
             is_correct=evaluation.correct
         )
 
-        # ----------------------------------------------------
-        # Return evaluation + progress
-        # ----------------------------------------------------
+        # 6. Save the evaluation for Practice questions.
+        if practice_question:
+            practice_question.student_answer = request.student_answer
+            practice_question.evaluation_feedback = evaluation.feedback
+            practice_question.is_correct = evaluation.correct
+            practice_question.status = "answered"
+            practice_question.answered_at = datetime.utcnow()
+
+            db.commit()
 
         return {
-
             "correct": evaluation.correct,
-
             "feedback": evaluation.feedback,
-
             "progress": {
-
                 "topic": progress.topic,
-
                 "concept": progress.concept,
-
                 "attempts": progress.attempts,
-
                 "correct": progress.correct,
-
                 "incorrect": progress.incorrect,
-
                 "mastery": progress.mastery,
-
                 "status": progress.status
             }
         }
 
     except HTTPException:
-
+        db.rollback()
         raise
 
     except Exception as e:
+        db.rollback()
 
         import traceback
 
-        print(
-            "\n========== EVALUATION ERROR =========="
-        )
-
-        print(
-            "Error:",
-            repr(e)
-        )
-
+        print("\n========== EVALUATION ERROR ==========")
+        print("Error:", repr(e))
         traceback.print_exc()
-
-        print(
-            "======================================\n"
-        )
+        print("======================================\n")
 
         raise HTTPException(
             status_code=500,
-
-            detail=(
-                "Failed to "
-                "evaluate answer."
-            )
+            detail="Failed to evaluate answer."
         )
-        
+
+    finally:
+        db.close()
+
+
 # ============================================================
-# GET COURSE PROGRESS
+# Practice API
 # ============================================================
-      
-@app.get("/progress/{course_id}")
-def get_course_progress(
+@app.post("/practice/{course_id}")
+
+
+
+def generate_practice(
     course_id: str,
-    current_user=Depends(
-        get_current_user
-    )
+    current_user=Depends(get_current_user)
 ):
-
-    user = get_or_create_user(
-        current_user
-    )
-
+    user = get_or_create_user(current_user)
     db = SessionLocal()
 
     try:
-
-        # ----------------------------------------------------
-        # Verify course belongs to logged-in user
-        # ----------------------------------------------------
-
         course = (
             db.query(Course)
             .filter(
@@ -1128,87 +1108,240 @@ def get_course_progress(
         )
 
         if not course:
-
             raise HTTPException(
                 status_code=404,
                 detail="Course not found"
             )
 
-        # ----------------------------------------------------
-        # Fetch learning progress
-        # ----------------------------------------------------
-
-        progress_records = (
-            db.query(LearningProgress)
-            .filter(
-                LearningProgress.course_id
-                == course_id,
-
-                LearningProgress.user_id
-                == user.id
-            )
-            .order_by(
-                LearningProgress.updated_at.desc()
-            )
-            .all()
+        practice = generate_practice_question(
+            course_id=course_id,
+            user_id=user.id
         )
 
-        # ----------------------------------------------------
-        # Return progress
-        # ----------------------------------------------------
+        saved_question = PracticeQuestion(
+            id=str(uuid4()),
+            user_id=user.id,
+            course_id=course_id,
+            topic=practice.topic,
+            concept=practice.concept,
+            quiz_question=practice.quiz_question,
+            expected_answer=practice.expected_answer,
+            quiz_explanation=practice.quiz_explanation,
+            status="pending"
+        )
 
+        db.add(saved_question)
+        db.commit()
+        db.refresh(saved_question)
+
+        # Do not send the expected answer to the browser.
         return {
-            "course_id": course_id,
-
-            "progress": [
-                {
-                    "topic": progress.topic,
-
-                    "concept": progress.concept,
-
-                    "attempts": progress.attempts,
-
-                    "correct": progress.correct,
-
-                    "incorrect": progress.incorrect,
-
-                    "mastery": progress.mastery,
-
-                    "status": progress.status
-                }
-
-                for progress in progress_records
-            ]
+            "id": saved_question.id,
+            "course_id": saved_question.course_id,
+            "topic": saved_question.topic,
+            "concept": saved_question.concept,
+            "quiz_question": saved_question.quiz_question,
+            "status": saved_question.status,
+            "created_at": saved_question.created_at.isoformat()
         }
 
     except HTTPException:
-
+        db.rollback()
         raise
 
     except Exception as e:
-
+        db.rollback()
         import traceback
-
-        print(
-            "\n========== PROGRESS ERROR =========="
-        )
-
-        print(
-            "Error:",
-            repr(e)
-        )
-
         traceback.print_exc()
-
-        print(
-            "====================================\n"
-        )
 
         raise HTTPException(
             status_code=500,
-            detail="Failed to fetch course progress."
+            detail="Failed to generate a practice question."
         )
 
     finally:
-
         db.close()
+
+
+# ============================================================
+# Practice History API
+# ============================================================       
+@app.get("/practice/{course_id}/history")
+def get_practice_history(
+    course_id: str,
+    current_user=Depends(get_current_user)
+):
+    user = get_or_create_user(current_user)
+    db = SessionLocal()
+
+    try:
+        course = (
+            db.query(Course)
+            .filter(
+                Course.id == course_id,
+                Course.user_id == user.id
+            )
+            .first()
+        )
+
+        if not course:
+            raise HTTPException(
+                status_code=404,
+                detail="Course not found"
+            )
+
+        questions = (
+            db.query(PracticeQuestion)
+            .filter(
+                PracticeQuestion.course_id == course_id,
+                PracticeQuestion.user_id == user.id
+            )
+            .order_by(PracticeQuestion.created_at.desc())
+            .all()
+        )
+
+        return {
+            "course_id": course_id,
+            "questions": [
+                {
+                    "id": item.id,
+                    "topic": item.topic,
+                    "concept": item.concept,
+                    "quiz_question": item.quiz_question,
+                    "student_answer": item.student_answer,
+                    "evaluation_feedback": item.evaluation_feedback,
+                    "is_correct": item.is_correct,
+                    "status": item.status,
+                    "created_at": item.created_at.isoformat(),
+                    "answered_at": (
+                        item.answered_at.isoformat()
+                        if item.answered_at else None
+                    )
+                }
+                for item in questions
+            ]
+        }
+
+    finally:
+        db.close()
+        
+        
+
+@app.get("/practice/{course_id}/question/{question_id}")
+def get_practice_question(
+    course_id: str,
+    question_id: str,
+    current_user=Depends(get_current_user)
+):
+    user = get_or_create_user(current_user)
+    db = SessionLocal()
+
+    try:
+        # Verify course ownership.
+        course = (
+            db.query(Course)
+            .filter(
+                Course.id == course_id,
+                Course.user_id == user.id
+            )
+            .first()
+        )
+
+        if not course:
+            raise HTTPException(
+                status_code=404,
+                detail="Course not found"
+            )
+
+        # Find the question belonging to this user and course.
+        question = (
+            db.query(PracticeQuestion)
+            .filter(
+                PracticeQuestion.id == question_id,
+                PracticeQuestion.course_id == course_id,
+                PracticeQuestion.user_id == user.id
+            )
+            .first()
+        )
+
+        if not question:
+            raise HTTPException(
+                status_code=404,
+                detail="Practice question not found"
+            )
+
+        # Never expose the expected answer or explanation here.
+        return {
+            "id": question.id,
+            "course_id": question.course_id,
+            "topic": question.topic,
+            "concept": question.concept,
+            "quiz_question": question.quiz_question,
+            "status": question.status,
+            "created_at": question.created_at.isoformat(),
+        }
+
+    finally:
+        db.close()
+        
+
+# ============================================================
+# GET LEARNING PROGRESS
+# ============================================================
+
+@app.get("/progress/{course_id}")
+def get_learning_progress(
+    course_id: str,
+    current_user=Depends(get_current_user)
+):
+    user = get_or_create_user(current_user)
+    db = SessionLocal()
+
+    try:
+        # Verify that the course belongs to the logged-in user.
+        course = (
+            db.query(Course)
+            .filter(
+                Course.id == course_id,
+                Course.user_id == user.id
+            )
+            .first()
+        )
+
+        if not course:
+            raise HTTPException(
+                status_code=404,
+                detail="Course not found"
+            )
+
+        # Retrieve progress records for this course and user.
+        progress_records = (
+            db.query(LearningProgress)
+            .filter(
+                LearningProgress.user_id == user.id,
+                LearningProgress.course_id == course_id
+            )
+            .order_by(LearningProgress.topic, LearningProgress.concept)
+            .all()
+        )
+
+        return {
+            "course_id": course_id,
+            "progress": [
+                {
+                    "id": item.id,
+                    "topic": item.topic,
+                    "concept": item.concept,
+                    "attempts": item.attempts,
+                    "correct": item.correct,
+                    "incorrect": item.incorrect,
+                    "mastery": item.mastery,
+                    "status": item.status
+                }
+                for item in progress_records
+            ]
+        }
+
+    finally:
+        db.close()
+

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer,Text
+from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Text, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -136,3 +136,45 @@ class LearningProgress(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
+    
+class PracticeQuestion(Base):
+    __tablename__ = "practice_questions"
+
+    id = Column(String, primary_key=True)
+
+    user_id = Column(
+        String,
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    course_id = Column(
+        String,
+        ForeignKey("courses.id"),
+        nullable=False
+    )
+
+    topic = Column(String, nullable=False)
+    concept = Column(String, nullable=False)
+
+    quiz_question = Column(Text, nullable=False)
+    expected_answer = Column(Text, nullable=False)
+    quiz_explanation = Column(Text, nullable=False)
+
+    student_answer = Column(Text, nullable=True)
+    evaluation_feedback = Column(Text, nullable=True)
+    is_correct = Column(Boolean, nullable=True)
+
+    status = Column(
+        String,
+        default="pending",
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    answered_at = Column(DateTime, nullable=True)
