@@ -39,6 +39,11 @@ interface PracticeContextType {
     practiceLoading: boolean;
     historyLoading: boolean;
     practiceError: string;
+    studentAnswer: string;
+    setStudentAnswer: (answer: string) => void;
+
+    submitted: boolean;
+    setSubmitted: (submitted: boolean) => void;
 
     generatePractice: (
         courseId: string
@@ -84,6 +89,8 @@ export function PracticeProvider({
     const [practiceError, setPracticeError] =
         useState("");
 
+    const [studentAnswer, setStudentAnswer] = useState("");
+    const [submitted, setSubmitted] = useState(false);
     const fetchPracticeHistory = async (
         courseId: string
     ): Promise<void> => {
@@ -266,6 +273,10 @@ export function PracticeProvider({
                 fetchPracticeHistory,
                 clearPractice,
                 loadPracticeQuestion,
+                studentAnswer,
+                setStudentAnswer,
+                submitted,
+                setSubmitted,
             }}
         >
             {children}

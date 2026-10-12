@@ -1,18 +1,29 @@
 import { useState } from "react";
-import { MessageCircle, Brain } from "lucide-react";
+import {
+  MessageCircle,
+  Brain,
+} from "lucide-react";
+import {
+  AnimatePresence,
+  motion,
+  LayoutGroup,
+} from "framer-motion";
 import { toast } from "sonner";
+import { useParams } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { useCourses } from "../../context/CourseContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useTutor } from "../../context/TutorContext";
 import { InlineError } from "../ui/Skeleton";
-import { useParams } from "react-router-dom";
 import TutorResponse from "./TutorResponse";
 import Practice from "./Practice";
 
+type TutorMode = "ask" | "practice";
+
 export default function Tutor() {
-  const [mode, setMode] = useState<"ask" | "practice">("ask");
+  const [mode, setMode] = useState<TutorMode>("ask");
+
   const { user } = useAuth();
   const { courses } = useCourses();
   const { darkMode } = useTheme();
@@ -27,17 +38,14 @@ export default function Tutor() {
   } = useTutor();
 
   const handleAskTutor = async () => {
-    if (!question.trim()) {
-      return;
-    }
+    if (!question.trim()) return;
 
     if (!user) {
       toast.error("Please log in first.");
       return;
     }
 
-    const selectedCourseId =
-      courseId || courses[0]?.id;
+    const selectedCourseId = courseId || courses[0]?.id;
 
     if (!selectedCourseId) {
       toast.warning("Please upload a course first.");
@@ -45,10 +53,7 @@ export default function Tutor() {
     }
 
     try {
-      await askTutor(
-        question.trim(),
-        selectedCourseId
-      );
+      await askTutor(question.trim(), selectedCourseId);
     } catch (error) {
       console.error("Tutor failed:", error);
 
@@ -60,6 +65,14 @@ export default function Tutor() {
     }
   };
 
+  const activeTabClass = darkMode
+    ? "text-black"
+    : "text-white";
+
+  const inactiveTabClass = darkMode
+    ? "text-zinc-400 hover:text-white"
+    : "text-zinc-600 hover:text-black";
+
   return (
     <div
       className={`mt-8 rounded-2xl border p-6 transition-colors duration-300 ${darkMode
@@ -67,117 +80,154 @@ export default function Tutor() {
         : "border-(--learnai-primary-soft) bg-(--learnai-surface) shadow-sm"
         }`}
     >
-      <div
-        className={`mb-5 flex rounded-xl border p-1 ${darkMode
-          ? "border-white/10 bg-zinc-900"
-          : "border-(--learnai-primary-soft) bg-zinc-50"
-          }`}
-      >
-        <button
-          type="button"
-          onClick={() => setMode("ask")}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition ${mode === "ask"
-            ? darkMode
-              ? "bg-white text-black"
-              : "bg-black text-white"
-            : darkMode
-              ? "text-zinc-400 hover:text-white"
-              : "text-zinc-600 hover:text-black"
+      <LayoutGroup>
+        {/* Animated tabs */}
+        <div
+          className={`mb-5 flex rounded-xl border p-1 ${darkMode
+            ? "border-white/10 bg-zinc-900"
+            : "border-(--learnai-primary-soft) bg-zinc-50"
             }`}
         >
-          <MessageCircle size={16} />
-          Ask
-        </button>
+          <button
+            type="button"
+            onClick={() => setMode("ask")}
+            aria-pressed={mode === "ask"}
+            className={`relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${mode === "ask"
+              ? activeTabClass
+              : inactiveTabClass
+              }`}
+          >
+            {mode === "ask" && (
+              <motion.span
+                layoutId="tutor-active-tab"
+                className={`absolute inset-0 rounded-lg ${darkMode ? "bg-white" : "bg-black"
+                  }`}
+                transition={{
+                  type: "spring",
+                  stiffness: 380,
+                  damping: 32,
+                }}
+              />
+            )}
 
-        <button
-          type="button"
-          onClick={() => setMode("practice")}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition ${mode === "practice"
-            ? darkMode
-              ? "bg-white text-black"
-              : "bg-black text-white"
-            : darkMode
-              ? "text-zinc-400 hover:text-white"
-              : "text-zinc-600 hover:text-black"
-            }`}
-        >
-          <Brain size={16} />
-          Practice
-        </button>
-      </div>
-      {mode === "ask" ? (
-        <>
-          {/* ASK INPUT */}
+            <span className="relative z-10 flex items-center gap-2">
+              <MessageCircle size={16} />
+              Ask
+            </span>
+          </button>
 
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              value={question}
-              disabled={askingTutor}
-              onChange={(e) =>
-                setQuestion(e.target.value)
-              }
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  !askingTutor
-                ) {
-                  void handleAskTutor();
-                }
+          <button
+            type="button"
+            onClick={() => setMode("practice")}
+            aria-pressed={mode === "practice"}
+            className={`relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${mode === "practice"
+              ? activeTabClass
+              : inactiveTabClass
+              }`}
+          >
+            {mode === "practice" && (
+              <motion.span
+                layoutId="tutor-active-tab"
+                className={`absolute inset-0 rounded-lg ${darkMode ? "bg-white" : "bg-black"
+                  }`}
+                transition={{
+                  type: "spring",
+                  stiffness: 380,
+                  damping: 32,
+                }}
+              />
+            )}
+
+            <span className="relative z-10 flex items-center gap-2">
+              <Brain size={16} />
+              Practice
+            </span>
+          </button>
+        </div>
+
+        {/* Animated content */}
+        <AnimatePresence mode="wait" initial={false}>
+          {mode === "ask" ? (
+            <motion.section
+              key="practice"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{
+                duration: 0.3,
+                ease: "easeInOut",
               }}
-              placeholder="What do you want to learn?"
-              className={
-                darkMode
-                  ? "flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-white focus:ring-2 focus:ring-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                  : "flex-1 rounded-xl border border-(--learnai-primary-soft) bg-(--learnai-bg) px-4 py-3 text-sm text-black outline-none placeholder:text-zinc-400 focus:border-black focus:ring-2 focus:ring-black/10 disabled:cursor-not-allowed disabled:opacity-60"
-              }
-            />
-
-            {/* ASK BUTTON */}
-
-            <button
-              type="button"
-              onClick={() => void handleAskTutor()}
-              disabled={askingTutor || !question.trim()}
-              className={
-                darkMode
-                  ? "flex min-w-[120px] items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 font-medium text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
-                  : "flex min-w-[120px] items-center justify-center gap-2 rounded-xl bg-black px-6 py-3 font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-              }
             >
-              {askingTutor ? (
-                <>
-                  <span
-                    className={
-                      darkMode
-                        ? "h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black"
-                        : "h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <input
+                  type="text"
+                  value={question}
+                  disabled={askingTutor}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !askingTutor) {
+                      void handleAskTutor();
                     }
-                  />
+                  }}
+                  placeholder="What do you want to learn?"
+                  className={
+                    darkMode
+                      ? "min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-white focus:ring-2 focus:ring-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      : "min-w-0 flex-1 rounded-xl border border-(--learnai-primary-soft) bg-(--learnai-bg) px-4 py-3 text-sm text-black outline-none placeholder:text-zinc-400 focus:border-black focus:ring-2 focus:ring-black/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  }
+                />
 
-                  Thinking...
-                </>
-              ) : (
-                "Ask Tutor"
+                <button
+                  type="button"
+                  onClick={() => void handleAskTutor()}
+                  disabled={askingTutor || !question.trim()}
+                  className={
+                    darkMode
+                      ? "flex min-w-[120px] items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 font-medium text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      : "flex min-w-[120px] items-center justify-center gap-2 rounded-xl bg-black px-6 py-3 font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  }
+                >
+                  {askingTutor ? (
+                    <>
+                      <span
+                        className={
+                          darkMode
+                            ? "h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black"
+                            : "h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                        }
+                      />
+                      Thinking...
+                    </>
+                  ) : (
+                    "Ask Tutor"
+                  )}
+                </button>
+              </div>
+
+              {tutorError && (
+                <div className="mt-5">
+                  <InlineError message={tutorError} />
+                </div>
               )}
-            </button>
-          </div>
 
-          {/* ERROR */}
-
-          {tutorError && (
-            <div className="mt-5">
-              <InlineError message={tutorError} />
-            </div>
+              <TutorResponse />
+            </motion.section>
+          ) : (
+            <motion.section
+              key="practice"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{
+                duration: 0.3,
+                ease: "easeInOut",
+              }}
+            >
+              <Practice embedded={true} />
+            </motion.section>
           )}
-
-          {/* TUTOR RESPONSE */}
-
-          <TutorResponse />
-        </>
-      ) : (
-        <Practice embedded={true} />
-      )}
+        </AnimatePresence>
+      </LayoutGroup>
     </div>
   );
 }

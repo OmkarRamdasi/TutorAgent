@@ -1,5 +1,3 @@
-import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import {
     ArrowLeft,
     BookOpen,
@@ -7,6 +5,8 @@ import {
     FileQuestion,
     RefreshCw,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { useAuth } from "../../context/AuthContext";
@@ -37,6 +37,10 @@ export default function Practice({
         generatePractice,
         fetchPracticeHistory,
         loadPracticeQuestion,
+        studentAnswer,
+        setStudentAnswer,
+        submitted,
+        setSubmitted,
     } = usePractice();
     const {
         evaluateAnswer,
@@ -48,9 +52,6 @@ export default function Practice({
     const {
         fetchProgress,
     } = useProgress();
-
-    const [studentAnswer, setStudentAnswer] = useState("");
-    const [submitted, setSubmitted] = useState(false);
 
     const practiceSectionRef = useRef<HTMLElement | null>(null);
 

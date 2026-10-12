@@ -1,4 +1,3 @@
-
 import { Outlet, useLocation } from "react-router-dom";
 
 import { useTheme } from "../../context/ThemeContext";
@@ -19,18 +18,18 @@ export default function AuthenticatedLayout() {
     <div
       className={
         darkMode
-          ? "flex min-h-screen flex-col bg-zinc-950 text-white transition-colors duration-300"
-          : "flex min-h-screen flex-col bg-(--learnai-bg) text-(--learnai-primary) transition-colors duration-300"
+          ? "flex h-screen flex-col overflow-hidden bg-zinc-950 text-white transition-colors duration-300"
+          : "flex h-screen flex-col overflow-hidden bg-(--learnai-bg) text-(--learnai-primary) transition-colors duration-300"
       }
     >
       <Header />
 
-      <div className="flex flex-1 items-stretch">
+      <div className="flex min-h-0 flex-1 items-stretch overflow-hidden">
         <div className="flex shrink-0 self-stretch">
           {isCourseWorkspace ? <CourseSidebar /> : <Sidebar />}
         </div>
 
-        <main className="min-h-full min-w-0 flex-1">
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
           <Outlet />
         </main>
       </div>
