@@ -57,6 +57,11 @@ interface TutorContextType {
     questionOverride?: TutorResponse,
     practiceQuestionId?: string
   ) => Promise<Evaluation>;
+
+  quickCheckAnswer: string;
+  setQuickCheckAnswer: (answer: string) => void;
+
+  clearEvaluation: () => void;
 }
 
 const TutorContext =
@@ -93,6 +98,14 @@ export function TutorProvider({
 
   const [evaluationError, setEvaluationError] =
     useState("");
+
+  const [quickCheckAnswer, setQuickCheckAnswer] =
+    useState("");
+
+  const clearEvaluation = () => {
+    setEvaluation(null);
+    setEvaluationError("");
+  };
 
   // ============================================================
   // ASK TUTOR
@@ -294,6 +307,10 @@ export function TutorProvider({
 
         evaluateAnswer,
 
+        quickCheckAnswer,
+        setQuickCheckAnswer,
+
+        clearEvaluation,
       }}
     >
       {children}

@@ -44,16 +44,26 @@ collection = chroma_client.get_collection(
 
 class ConceptIdentification(BaseModel):
     """
-    Identifies the broad topic and specific concept
-    related to the student's question.
+    Identifies the topic and concept supported
+    by the retrieved course material.
     """
 
     topic: str = Field(
-        description="The broad Data Science topic."
+        description="The broad topic supported by the course material."
     )
 
     concept: str = Field(
-        description="The specific concept being asked about."
+        description="The specific concept supported by the course material."
+    )
+
+    status: str = Field(
+        default="identified",
+        description=(
+            "Use 'identified' when the material supports "
+            "the concept. Use 'insufficient_information' "
+            "when the material does not provide enough "
+            "evidence to identify the concept."
+        )
     )
 
 
@@ -674,21 +684,24 @@ def identify_concept(
 ):
     """
     Identify the broad topic and specific concept
-    before generating the lesson.
-
-    This allows us to check the student's memory
-    before teaching the concept.
+    using retrieved course material only.
     """
 
+    if not retrieved_chunks or not any(
+        chunk.strip() for chunk in retrieved_chunks
+    ):
+        return None
+
     context = "\n\n".join(
-        retrieved_chunks
+        chunk for chunk in retrieved_chunks
+        if chunk.strip()
     )
 
     prompt = f"""
-You are a Data Science tutor.
+You are a course-grounded learning assistant.
 
-Your task is to identify the broad topic and
-specific concept related to the student's question.
+Identify the broad topic and specific concept
+that the student's question relates to.
 
 Use ONLY the course material provided below.
 
@@ -708,41 +721,47 @@ STUDENT QUESTION
 RULES
 ==================================================
 
-1. Identify a broad Data Science topic.
+1. Identify a broad topic supported by the course material.
 
-2. Identify the specific concept being asked about.
+2. Identify the specific concept relevant to the question.
 
-3. The topic should be broad.
+3. Keep the topic and concept concise.
+
+4. Do not use the student's question alone as evidence
+   that a concept is covered in the course.
+
+5. Do not invent topics or concepts.
+
+6. If the material does not contain enough information
+   to identify a supported concept, do not guess.
+   Return an identification indicating insufficient
+   course information, following the required output schema.
+
+7. Use consistent topic and concept names for the same
+   concepts across different questions.
 
 Example:
 
 Topic: Data Preprocessing
-Concept: Public Data
+Concept: Missing Value Imputation
 
-NOT:
+Avoid:
 
-Topic: What is public data?
-Concept: What is public data?
-
-4. Do not invent concepts that are not supported
-   by the course material.
+Topic: What is missing value imputation?
+Concept: What is missing value imputation?
 """
 
     try:
-
         return generate_with_retry(
             prompt,
             ConceptIdentification
         )
 
     except Exception as e:
-
         print(
-            "\n❌ Could not identify the concept."
+            "\nCould not identify the concept."
         )
-
         print("Reason:", e)
-
         return None
 
 
@@ -1719,10 +1738,15 @@ def ask_tutor(
         question,
         retrieved_chunks
     )
-
-    if concept_identification is None:
+    
+    if (
+        concept_identification is None
+        or concept_identification.status
+        == "insufficient_information"
+    ):
         raise RuntimeError(
-            "Could not identify the concept."
+            "The uploaded course material does not contain "
+            "enough information to answer this question."
         )
 
    # 3. Read student memory from PostgreSQL

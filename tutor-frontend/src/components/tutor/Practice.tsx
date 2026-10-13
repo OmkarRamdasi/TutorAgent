@@ -47,6 +47,7 @@ export default function Practice({
         evaluatingAnswer,
         evaluation,
         evaluationError,
+        clearEvaluation
     } = useTutor();
 
     const {
@@ -110,6 +111,7 @@ export default function Practice({
         }
 
         try {
+            clearEvaluation();
             const question = await loadPracticeQuestion(
                 courseId,
                 questionId
@@ -129,7 +131,6 @@ export default function Practice({
             // Clear evaluation feedback from the previous question.
             // This assumes your TutorContext exposes a clear function;
             // if it doesn't, skip this line for now.
-            // clearEvaluation();
 
             if (question.status === "answered") {
                 toast.info("This question has already been answered.");

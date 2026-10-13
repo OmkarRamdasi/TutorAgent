@@ -30,6 +30,24 @@ interface ProgressContextType {
   ) => Promise<LearningProgress[]>;
 }
 
+export function getRecommendedConcept(
+  progress: LearningProgress[]
+): LearningProgress | null {
+  if (progress.length === 0) {
+    return null;
+  }
+
+  return [...progress].sort((a, b) => {
+    // Prioritize lower mastery.
+    if (a.mastery !== b.mastery) {
+      return a.mastery - b.mastery;
+    }
+
+    // If mastery is equal, prioritize fewer attempts.
+    return a.attempts - b.attempts;
+  })[0];
+}
+
 const ProgressContext =
   createContext<ProgressContextType | undefined>(
     undefined

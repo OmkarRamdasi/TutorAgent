@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MessageCircle,
   Brain,
@@ -9,7 +9,7 @@ import {
   LayoutGroup,
 } from "framer-motion";
 import { toast } from "sonner";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { useCourses } from "../../context/CourseContext";
@@ -29,6 +29,8 @@ export default function Tutor() {
   const { darkMode } = useTheme();
   const { courseId } = useParams();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const {
     question,
     setQuestion,
@@ -36,6 +38,20 @@ export default function Tutor() {
     askTutor,
     tutorError,
   } = useTutor();
+
+  useEffect(() => {
+    const concept = searchParams.get("concept");
+
+    if (!concept) return;
+
+    setQuestion(`Teach me ${concept} using my uploaded course material.`);
+    setMode("ask");
+
+    searchParams.delete("concept");
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams, setQuestion]);
+
+
 
   const handleAskTutor = async () => {
     if (!question.trim()) return;
@@ -75,9 +91,9 @@ export default function Tutor() {
 
   return (
     <div
-      className={`mt-8 rounded-2xl border p-6 transition-colors duration-300 ${darkMode
-        ? "border-white/10 bg-white/[0.02]"
-        : "border-(--learnai-primary-soft) bg-(--learnai-surface) shadow-sm"
+      className={`min-w-0 transition-colors duration-300 ${darkMode
+        ? "text-white"
+        : "text-(--learnai-primary)"
         }`}
     >
       <LayoutGroup>
@@ -149,7 +165,7 @@ export default function Tutor() {
         <AnimatePresence mode="wait" initial={false}>
           {mode === "ask" ? (
             <motion.section
-              key="practice"
+              key="ask"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
@@ -157,8 +173,9 @@ export default function Tutor() {
                 duration: 0.3,
                 ease: "easeInOut",
               }}
+              className="min-w-0"
             >
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <input
                   type="text"
                   value={question}
@@ -215,13 +232,14 @@ export default function Tutor() {
           ) : (
             <motion.section
               key="practice"
-              initial={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
+              exit={{ opacity: 0, x: -20 }}
               transition={{
                 duration: 0.3,
                 ease: "easeInOut",
               }}
+              className="min-w-0"
             >
               <Practice embedded={true} />
             </motion.section>

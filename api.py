@@ -595,32 +595,29 @@ def ask_tutor_endpoint(
             )
         }
 
-    except Exception as e:
-
-        import traceback
-
-        print(
-            "\n========== TUTOR ERROR =========="
-        )
-
-        print(
-            "Error:",
-            repr(e)
-        )
-
-        traceback.print_exc()
-
-        print(
-            "=================================\n"
-        )
+    except RuntimeError as e:
+        if "does not contain enough information" in str(e):
+            raise HTTPException(
+                status_code=422,
+                detail=str(e)
+            )
 
         raise HTTPException(
             status_code=500,
+            detail="Tutor failed to process the question."
+        )
 
-            detail=(
-                "Tutor failed to "
-                "process the question."
-            )
+    except Exception as e:
+        import traceback
+
+        print("\n========== TUTOR ERROR ==========")
+        print("Error:", repr(e))
+        traceback.print_exc()
+        print("=================================\n")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Tutor failed to process the question."
         )
 
 

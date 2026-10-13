@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { CheckCircle2, FileQuestion } from "lucide-react";
 import { toast } from "sonner";
 
+import { useCourses } from "../../context/CourseContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useTutor } from "../../context/TutorContext";
 import { InlineError, Skeleton } from "../ui/Skeleton";
-import { useCourses } from "../../context/CourseContext";
 
 export default function TutorResponse() {
   const { darkMode } = useTheme();
@@ -16,16 +15,18 @@ export default function TutorResponse() {
     evaluatingAnswer,
     evaluationError,
     evaluateAnswer,
+    quickCheckAnswer,
+    setQuickCheckAnswer,
   } = useTutor();
 
-  const [studentAnswer, setStudentAnswer] = useState("");
+
 
   if (!tutorResponse) {
     return null;
   }
 
   const handleEvaluateAnswer = async () => {
-    if (!studentAnswer.trim()) {
+    if (!quickCheckAnswer.trim()) {
       toast.warning("Please enter your answer.");
       return;
     }
@@ -39,7 +40,7 @@ export default function TutorResponse() {
 
     try {
       await evaluateAnswer(
-        studentAnswer.trim(),
+        quickCheckAnswer.trim(),
         courseId
       );
     } catch (error) {
@@ -69,7 +70,7 @@ export default function TutorResponse() {
       <div
         className={
           darkMode
-            ? "mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5"
+            ? "mt-8 rounded-2xl border border-white/10 bg-white/4 p-5"
             : "mt-8 rounded-2xl border border-zinc-200 bg-zinc-50 p-5"
         }
       >
@@ -85,8 +86,8 @@ export default function TutorResponse() {
         </p>
 
         <textarea
-          value={studentAnswer}
-          onChange={(e) => setStudentAnswer(e.target.value)}
+          value={quickCheckAnswer}
+          onChange={(e) => setQuickCheckAnswer(e.target.value)}
           placeholder="Type your answer..."
           rows={3}
           disabled={evaluatingAnswer}
@@ -100,7 +101,7 @@ export default function TutorResponse() {
         <button
           type="button"
           onClick={() => void handleEvaluateAnswer()}
-          disabled={evaluatingAnswer || !studentAnswer.trim()}
+          disabled={evaluatingAnswer || !quickCheckAnswer.trim()}
           className={
             darkMode
               ? "mt-3 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
@@ -111,7 +112,7 @@ export default function TutorResponse() {
         </button>
 
         {evaluatingAnswer && (
-          <div className="mt-5 space-y-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/[0.02]">
+          <div className="mt-5 space-y-2 rounded-xl border border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-white/2">
             <div className="flex items-center gap-2">
               <Skeleton className="h-5 w-5 rounded-full" />
               <Skeleton className="h-4 w-24" />
@@ -128,7 +129,7 @@ export default function TutorResponse() {
         )}
 
         {evaluation && !evaluatingAnswer && (
-          <div className={darkMode ? "mt-5 rounded-xl border border-white/10 bg-white/[0.04] p-4" : "mt-5 rounded-xl border border-zinc-200 bg-white p-4"}>
+          <div className={darkMode ? "mt-5 rounded-xl border border-white/10 bg-white/4 p-4" : "mt-5 rounded-xl border border-zinc-200 bg-white p-4"}>
             <div className={darkMode ? "flex items-center gap-2 font-semibold text-white" : "flex items-center gap-2 font-semibold text-black"}>
               {evaluation.correct ? <CheckCircle2 size={17} /> : <FileQuestion size={17} />}
               {evaluation.correct ? "Correct" : "Keep learning"}

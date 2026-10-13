@@ -5,7 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "../../context/AuthContext";
 import { useCourses } from "../../context/CourseContext";
-import { useProgress } from "../../context/ProgressContext";
+import { useProgress, getRecommendedConcept } from "../../context/ProgressContext";
 import { useTheme } from "../../context/ThemeContext";
 import { InlineError } from "../ui/Skeleton";
 
@@ -41,6 +41,8 @@ export default function LearningJourney() {
                 ) / progress.length
             )
             : 0;
+
+    const recommendedConcept = getRecommendedConcept(progress);
 
     const totalAttempts = progress.reduce(
         (total, item) => total + item.attempts,
@@ -195,6 +197,51 @@ export default function LearningJourney() {
                                 </div>
                             ))}
                         </div>
+
+                        {recommendedConcept && (
+                            <section
+                                className={`mb-6 rounded-2xl border p-5 sm:p-6 ${surface}`}
+                            >
+                                <p className={muted}>RECOMMENDED NEXT</p>
+
+                                <h2 className="mt-2 text-lg font-semibold">
+                                    {recommendedConcept.concept}
+                                </h2>
+
+                                <p className={`mt-1 ${muted}`}>
+                                    {recommendedConcept.topic}
+                                </p>
+
+                                <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+                                    <div>
+                                        <p className={muted}>Current mastery</p>
+                                        <p className="mt-1 text-2xl font-semibold">
+                                            {Math.min(
+                                                100,
+                                                Math.max(0, recommendedConcept.mastery)
+                                            )}%
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            navigate(
+                                                `/app/tutor/${courseId}?concept=${encodeURIComponent(
+                                                    recommendedConcept.concept
+                                                )}`
+                                            )
+                                        }
+                                        className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${darkMode
+                                                ? "bg-white text-black hover:bg-zinc-200"
+                                                : "bg-black text-white hover:bg-zinc-800"
+                                            }`}
+                                    >
+                                        Review this concept
+                                    </button>
+                                </div>
+                            </section>
+                        )}
 
                         <section
                             className={`mt-6 rounded-2xl border p-5 sm:p-6 ${surface}`}

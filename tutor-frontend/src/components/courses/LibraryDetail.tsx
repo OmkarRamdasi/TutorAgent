@@ -43,7 +43,7 @@ export default function LibraryDetail() {
   } = useProgress();
 
   const [summary, setSummary] = useState<string | null>(null);
-  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   useEffect(() => {
     if (!courseId || !user) return;
