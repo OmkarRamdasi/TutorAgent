@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import {
   MessageCircle,
@@ -23,6 +24,8 @@ type TutorMode = "ask" | "practice";
 
 export default function Tutor() {
   const [mode, setMode] = useState<TutorMode>("ask");
+  const [selectedTopic, setSelectedTopic] = useState("");
+  const [selectedConcept, setSelectedConcept] = useState("");
 
   const { user } = useAuth();
   const { courses } = useCourses();
@@ -37,21 +40,40 @@ export default function Tutor() {
     askingTutor,
     askTutor,
     tutorError,
+    tutorResponse,
+    resetTutorSession,
   } = useTutor();
 
+  // Read the selected topic/concept from navigation.
+  // Prefill the prompt only; do not call Gemini here.
   useEffect(() => {
-    const concept = searchParams.get("concept");
+    const topic = searchParams.get("topic") ?? "";
+    const concept = searchParams.get("concept") ?? "";
 
-    if (!concept) return;
+    if (!topic && !concept) return;
 
-    setQuestion(`Teach me ${concept} using my uploaded course material.`);
+    resetTutorSession();
+
+    setSelectedTopic(topic);
+    setSelectedConcept(concept);
+
+    const prompt = topic
+      ? `Teach me "${concept}" under the topic "${topic}" using my uploaded course material. Explain it step by step, provide an example, and ask a quick-check question.`
+      : `Teach me "${concept}" using my uploaded course material. Explain it step by step, provide an example, and ask a quick-check question.`;
+
+    setQuestion(prompt);
     setMode("ask");
 
-    searchParams.delete("concept");
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, setQuestion]);
-
-
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("topic");
+    nextParams.delete("concept");
+    setSearchParams(nextParams, { replace: true });
+  }, [
+    searchParams,
+    setSearchParams,
+    setQuestion,
+    resetTutorSession,
+  ]);
 
   const handleAskTutor = async () => {
     if (!question.trim()) return;
@@ -91,33 +113,33 @@ export default function Tutor() {
 
   return (
     <div
-      className={`min-w-0 transition-colors duration-300 ${darkMode
-        ? "text-white"
-        : "text-(--learnai-primary)"
-        }`}
+      className={`min-w-0 transition-colors duration-300 ${
+        darkMode ? "text-white" : "text-(--learnai-primary)"
+      }`}
     >
       <LayoutGroup>
         {/* Animated tabs */}
         <div
-          className={`mb-5 flex rounded-xl border p-1 ${darkMode
-            ? "border-white/10 bg-zinc-900"
-            : "border-(--learnai-primary-soft) bg-zinc-50"
-            }`}
+          className={`mb-5 flex rounded-xl border p-1 ${
+            darkMode
+              ? "border-white/10 bg-zinc-900"
+              : "border-(--learnai-primary-soft) bg-zinc-50"
+          }`}
         >
           <button
             type="button"
             onClick={() => setMode("ask")}
             aria-pressed={mode === "ask"}
-            className={`relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${mode === "ask"
-              ? activeTabClass
-              : inactiveTabClass
-              }`}
+            className={`relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
+              mode === "ask" ? activeTabClass : inactiveTabClass
+            }`}
           >
             {mode === "ask" && (
               <motion.span
                 layoutId="tutor-active-tab"
-                className={`absolute inset-0 rounded-lg ${darkMode ? "bg-white" : "bg-black"
-                  }`}
+                className={`absolute inset-0 rounded-lg ${
+                  darkMode ? "bg-white" : "bg-black"
+                }`}
                 transition={{
                   type: "spring",
                   stiffness: 380,
@@ -136,16 +158,16 @@ export default function Tutor() {
             type="button"
             onClick={() => setMode("practice")}
             aria-pressed={mode === "practice"}
-            className={`relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${mode === "practice"
-              ? activeTabClass
-              : inactiveTabClass
-              }`}
+            className={`relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
+              mode === "practice" ? activeTabClass : inactiveTabClass
+            }`}
           >
             {mode === "practice" && (
               <motion.span
                 layoutId="tutor-active-tab"
-                className={`absolute inset-0 rounded-lg ${darkMode ? "bg-white" : "bg-black"
-                  }`}
+                className={`absolute inset-0 rounded-lg ${
+                  darkMode ? "bg-white" : "bg-black"
+                }`}
                 transition={{
                   type: "spring",
                   stiffness: 380,
@@ -175,6 +197,33 @@ export default function Tutor() {
               }}
               className="min-w-0"
             >
+              {/* Selected learning context */}
+              {selectedTopic && selectedConcept && (
+                <div
+                  className={`mb-4 rounded-xl border px-4 py-3 ${
+                    darkMode
+                      ? "border-purple-400/20 bg-purple-400/[0.06]"
+                      : "border-purple-200 bg-purple-50/70"
+                  }`}
+                >
+                  <p
+                    className={`truncate text-xs ${
+                      darkMode ? "text-zinc-400" : "text-zinc-500"
+                    }`}
+                    title={selectedTopic}
+                  >
+                    {selectedTopic}
+                  </p>
+                  <p
+                    className="mt-1 text-sm font-medium text-purple-500"
+                    title={selectedConcept}
+                  >
+                    {selectedConcept}
+                  </p>
+                </div>
+              )}
+
+              {/* Editable prompt; no request until Ask Tutor is clicked */}
               <div className="flex flex-col gap-3 sm:flex-row">
                 <input
                   type="text"
@@ -227,7 +276,8 @@ export default function Tutor() {
                 </div>
               )}
 
-              <TutorResponse />
+              {/* Hide old lesson after changing the selected concept */}
+              {tutorResponse && <TutorResponse />}
             </motion.section>
           ) : (
             <motion.section

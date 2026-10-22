@@ -3,6 +3,7 @@ import json
 import time
 import random
 from pathlib import Path
+from sqlalchemy import func
 
 import chromadb
 from dotenv import load_dotenv
@@ -389,6 +390,65 @@ def get_concept_progress_db(
             "incorrect": progress.incorrect,
             "mastery": progress.mastery,
             "status": progress.status
+        }
+
+    finally:
+        db.close()
+
+
+def get_concept_progress_across_courses(
+    user_id,
+    topic,
+    concept
+):
+    """
+    Aggregate learning history for the same user,
+    topic, and concept across all courses.
+    """
+
+    db = SessionLocal()
+
+    try:
+        # Match topic and concept without case sensitivity
+        # or leading/trailing whitespace.
+        progress_records = (
+            db.query(LearningProgress)
+            .filter(
+                LearningProgress.user_id == user_id,
+                func.lower(func.trim(LearningProgress.topic)) == topic.strip().lower(),
+                func.lower(func.trim(LearningProgress.concept)) == concept.strip().lower()
+            )
+            .all()
+        )
+
+        if not progress_records:
+            return None
+
+        total_attempts = sum(
+            item.attempts for item in progress_records
+        )
+        total_correct = sum(
+            item.correct for item in progress_records
+        )
+        total_incorrect = sum(
+            item.incorrect for item in progress_records
+        )
+
+        mastery = (
+            round(total_correct / total_attempts * 100)
+            if total_attempts > 0
+            else 0
+        )
+
+        return {
+            "topic": topic,
+            "concept": concept,
+            "attempts": total_attempts,
+            "correct": total_correct,
+            "incorrect": total_incorrect,
+            "mastery": mastery,
+            "status": get_learning_state(mastery / 100),
+            "courses_with_progress": len(progress_records)
         }
 
     finally:
@@ -901,6 +961,46 @@ TEACHING RULES
 15. Keep the explanation beginner-friendly.
 
 ==================================================
+SOURCE CODE AND ACCURACY RULES
+==================================================
+
+==================================================
+MARKDOWN CODE FORMATTING RULES
+==================================================
+
+- The lesson is rendered by a Markdown renderer.
+- Whenever you include a multi-line code example,
+  format it as a valid fenced Markdown code block.
+- Put the opening fence and language on their own line.
+- Put the code on the following line.
+- Put the closing fence on its own line.
+- Never place code on the same line as the opening
+  or closing fence.
+- Never put multi-line code inside single backticks.
+- Explain code outside the fenced code block.
+
+Required format:
+
+```python
+df['Spend'] = df['Spend'].fillna(
+    df['Spend'].mean()
+)
+```
+
+Incorrect format:
+
+```text
+Here is the code: ```python df['Spend'] = ...
+```
+
+- Preserve the actual code and variable names from
+  the provided course material.
+- Use inline backticks only for short identifiers
+  such as `np.nan`, `.fillna()`, and `df['Spend']`.
+
+
+
+==================================================
 PERSONALIZATION RULES
 ==================================================
 
@@ -948,11 +1048,16 @@ If the learning state is "strong":
 
     try:
 
-        return generate_with_retry(
+        result = generate_with_retry(
             prompt,
             TutorResponse
         )
 
+        print("\n===== GENERATED LESSON =====")
+        print(result.lesson)
+        print("============================\n")
+
+        return result
     except Exception as e:
 
         print(
@@ -968,7 +1073,7 @@ If the learning state is "strong":
 # 5. GENERATE PRACTICE QUESTION
 # ============================================================
 
-def generate_practice_question(
+def generate_practice_question_from_context(
     concept,
     retrieved_chunks,
     concept_history,
@@ -1084,6 +1189,89 @@ RULES
 
         return None
 
+# ============================================================
+# 5. GENERATE PRACTICE QUESTION FOR COURSE
+# ============================================================
+def generate_practice_for_course(
+    course_id: str,
+    user_id: str,
+    topic: str | None = None,
+    concept: str | None = None,
+):
+    """
+    Generate a practice question for the selected topic and concept,
+    using material from the specified course.
+    """
+
+    # If a concept was selected in Learning Journey, use it directly.
+    if concept:
+        target_concept = concept
+        target_topic = topic or "General"
+        search_query = f"{target_topic}: {target_concept}"
+    else:
+        # Preserve the existing behavior when no concept is selected.
+        search_query = "Generate a practice question from my course material"
+        target_topic = None
+        target_concept = None
+
+    retrieved_chunks = retrieve(
+        search_query,
+        course_id,
+        number_of_chunks=3,
+    )
+
+    if not retrieved_chunks:
+        raise ValueError("No relevant course material was found.")
+
+    # Identify the topic/concept only when the caller did not provide one.
+    if not target_concept:
+        identification = identify_concept(
+            search_query,
+            retrieved_chunks,
+        )
+
+        if identification is None:
+            raise ValueError("Could not identify a concept from the course material.")
+
+        target_topic = identification.topic
+        target_concept = identification.concept
+
+    # Load progress for the exact selected topic/concept.
+    concept_history = get_concept_progress_db(
+        user_id,
+        course_id,
+        target_topic,
+        target_concept,
+    )
+
+    mastery = (
+        concept_history["mastery"]
+        if concept_history
+        else 0
+    )
+
+    learning_state = get_learning_state(mastery)
+
+    # Call the existing low-level Gemini generator.
+    generated = generate_practice_question_from_context(
+        target_concept,
+        retrieved_chunks,
+        concept_history,
+        mastery,
+        learning_state,
+    )
+
+    if generated is None:
+        raise ValueError("Gemini could not generate a practice question.")
+
+    # Return the fields expected by the API endpoint.
+    return {
+        "topic": target_topic,
+        "concept": target_concept,
+        "quiz_question": generated.question,
+        "expected_answer": generated.expected_answer,
+        "quiz_explanation": generated.explanation,
+    }
 
 # ============================================================
 # 6. EVALUATE STUDENT ANSWER
@@ -1262,12 +1450,12 @@ def practice(
     # STEP 6: GENERATE PRACTICE QUESTION
     # --------------------------------------------------------
 
-    practice_question = generate_practice_question(
+    practice_question = generate_practice_question_from_context(
         actual_concept,
         retrieved_chunks,
         concept_history,
         mastery,
-        learning_state
+        learning_state,
     )
 
     if practice_question is None:
@@ -1711,64 +1899,90 @@ def agent(
 # ============================================================
 # Ask API
 # ============================================================
-def ask_tutor(
-    question,
-    course_id,
-    user_id
-):
+
+
+
+def ask_tutor(question, course_id, user_id):
     """
-    API-friendly tutor function.
-
-    Retrieves course material, identifies the concept,
-    reads student memory, calculates mastery, and
-    generates a lesson + quiz.
-
-    Does not use input() or print() for interaction.
+    Answer learner questions or teach the next roadmap concept.
     """
 
-    # 1. Retrieve course material
+    next_lesson_requests = {
+        "next",
+        "next lesson",
+        "teach me",
+        "continue learning",
+        "start learning",
+        "what should i learn next"
+    }
+
+    is_next_lesson = (
+        question.strip().casefold() in next_lesson_requests
+    )
+
+    next_concept = None
+
+    if is_next_lesson:
+        next_concept = get_next_learning_concept(
+            user_id,
+            course_id
+        )
+
+        if next_concept is None:
+            raise RuntimeError(
+                "All roadmap concepts have been completed, "
+                "or no eligible concepts remain."
+            )
+
+        question = (
+            f"Teach the exact concept '{next_concept['concept']}' "
+            f"under the topic '{next_concept['topic']}'. "
+            "Use the uploaded course material to explain this "
+            "specific concept, provide a relevant example, and "
+            "ask a quiz question about it. "
+            "Do not substitute a related concept or a different "
+            "statistical test. If the material does not support "
+            "this concept, report insufficient information."
+        )
+
     retrieved_chunks = retrieve(
         question,
         course_id,
         number_of_chunks=3
     )
 
-    # 2. Identify topic + concept
     concept_identification = identify_concept(
         question,
         retrieved_chunks
     )
-    
+
     if (
         concept_identification is None
-        or concept_identification.status
-        == "insufficient_information"
+        or concept_identification.status == "insufficient_information"
     ):
         raise RuntimeError(
             "The uploaded course material does not contain "
             "enough information to answer this question."
         )
 
-   # 3. Read student memory from PostgreSQL
-    concept_history = get_concept_progress_db(
+    if next_concept is not None:
+        concept_identification.topic = next_concept["topic"]
+        concept_identification.concept = next_concept["concept"]
+
+    concept_history = get_concept_progress_across_courses(
         user_id,
-        course_id,
         concept_identification.topic,
         concept_identification.concept
     )
 
-# 4. Calculate mastery from PostgreSQL
-    if concept_history is None:
-        mastery = 0.0
-    else:
-        mastery = concept_history["mastery"] / 100.0
-
-    # 5. Determine learning state
-    learning_state = get_learning_state(
-        mastery
+    mastery = (
+        concept_history["mastery"] / 100.0
+        if concept_history
+        else 0.0
     )
 
-    # 6. Generate lesson + quiz
+    learning_state = get_learning_state(mastery)
+
     tutor = generate_tutor_response(
         question,
         retrieved_chunks,
@@ -1779,11 +1993,72 @@ def ask_tutor(
     )
 
     if tutor is None:
-        raise RuntimeError(
-            "Could not generate tutor response."
-        )
+        raise RuntimeError("Could not generate tutor response.")
+
+    if next_concept is not None:
+        tutor.topic = next_concept["topic"]
+        tutor.concept = next_concept["concept"]
 
     return tutor
+
+
+
+
+# ============================================================
+# Get Next concept
+# ============================================================
+
+def get_next_learning_concept(user_id: str, course_id: str):
+    from database import SessionLocal
+    from models import LearningProgress
+
+    db = SessionLocal()
+
+    try:
+        # Continue an unfinished concept before starting a new one.
+        progress = (
+            db.query(LearningProgress)
+            .filter(
+                LearningProgress.user_id == user_id,
+                LearningProgress.course_id == course_id,
+                LearningProgress.status == "learning"
+            )
+            .order_by(
+                LearningProgress.attempts.asc(),
+                LearningProgress.topic.asc(),
+                LearningProgress.concept.asc()
+            )
+            .first()
+        )
+
+        # If no concept is in progress, select a new one.
+        if progress is None:
+            progress = (
+                db.query(LearningProgress)
+                .filter(
+                    LearningProgress.user_id == user_id,
+                    LearningProgress.course_id == course_id,
+                    LearningProgress.status == "not_started"
+                )
+                .order_by(
+                    LearningProgress.topic.asc(),
+                    LearningProgress.concept.asc()
+                )
+                .first()
+            )
+
+        if progress is None:
+            return None
+
+        return {
+            "topic": progress.topic,
+            "concept": progress.concept,
+            "mastery": progress.mastery,
+            "status": progress.status
+        }
+
+    finally:
+        db.close()
 
 
 # ============================================================
@@ -1822,9 +2097,8 @@ def generate_practice_question(
         )
 
     # 3. Read the student's learning history
-    concept_history = get_concept_progress_db(
+    concept_history = get_concept_progress_across_courses(
         user_id,
-        course_id,
         concept_identification.topic,
         concept_identification.concept
     )
@@ -1903,40 +2177,137 @@ def generate_course_summary(course_id):
     # Generate summary
     # --------------------------------------------------------
 
+    
     prompt = f"""
-You are an AI learning tutor.
+You are an AI learning assistant that creates practical,
+accurate study notes from uploaded course material.
 
-Create a clear and structured summary of the
-following course material.
+Your task is to create a useful study guide based ONLY
+on the supplied course material.
 
-COURSE MATERIAL:
+==================================================
+COURSE MATERIAL
+==================================================
+
 {context}
 
-Structure the response using:
+==================================================
+SUMMARY REQUIREMENTS
+==================================================
 
-## Course Overview
+Create the study guide using the following sections.
 
-Give a short overview of what the material covers.
+## 1. Course Overview
 
-## Main Topics
+- Explain what the material covers.
+- Describe its purpose and learning objectives.
+- Mention the libraries, tools, or technologies used
+  when they appear in the source.
+- Be specific to the supplied material.
+- Avoid generic introductions.
 
-List the major topics covered.
+## 2. Topics Covered
 
-## Important Concepts
+List the distinct topics and concepts actually
+present in the material.
 
-Explain the most important concepts briefly.
+For each topic:
+- Give its name.
+- Explain what it does.
+- Explain why it is used in the source, when supported.
 
-## Key Takeaways
+## 3. Important Concepts
 
-List the most important things a learner should remember.
+Explain the important concepts in beginner-friendly
+language.
 
-Rules:
-- Use only information present in the course material.
-- Do not invent topics or concepts.
-- Keep the explanation learner-friendly.
-- Use clear headings and bullet points.
-- Focus on important information rather than minor details.
+For each concept:
+- Explain its meaning.
+- Explain how it is used in the supplied material.
+- Preserve the original terminology, variable names,
+  column names, and function names.
+
+## 4. Code Walkthrough
+
+Identify the most important code examples in the
+supplied material.
+
+For each relevant example:
+
+- Reproduce the source code accurately.
+- Preserve the original variable and column names.
+- Use a fenced Markdown code block with a language
+  identifier such as ```python or ```sql.
+- Put the opening fence, code, and closing fence
+  on separate lines.
+- Explain the code step by step outside the code block.
+- Explain the purpose of important functions and methods.
+- Describe the output only when it is shown in the
+  source or can be established directly from it.
+- Do not invent code results or claim code was executed.
+
+If the material contains no relevant code, state that
+no code example was found in the supplied content.
+
+## 5. Workflow
+
+Explain the sequence of operations demonstrated
+in the material.
+
+Use a numbered list where appropriate.
+
+Describe how each step relates to the next.
+Do not invent steps that are absent from the source.
+
+## 6. Key Takeaways
+
+List the most important practical lessons.
+
+Focus on:
+- What the learner should understand.
+- Which operations or methods are important.
+- What the code accomplishes.
+- Any limitations explicitly discussed in the source.
+
+## 7. Results and Observations
+
+- Report numerical results only when they are explicitly
+  present in the material or can be calculated reliably
+  from the supplied code and data.
+- Clearly distinguish calculated results from results
+  explicitly shown in the source.
+- Explain important observations from the code.
+- Mention important outputs that are created but not
+  displayed, when relevant.
+- Never claim the code was executed if it was not.
+
+## 8. Revision Questions
+
+Create up to five short questions based only on
+the supplied material.
+
+Do not include answers in this section.
+Do not ask questions about concepts absent from
+the source.
+
+==================================================
+ACCURACY AND FORMATTING RULES
+==================================================
+
+1. Use only information supported by the course material.
+2. Do not invent topics, code, results, or definitions.
+3. Do not repeat the same information across sections.
+4. Keep explanations clear, specific, and practical.
+5. Use Markdown headings, paragraphs, and bullet lists.
+6. Use fenced code blocks for multi-line code examples.
+7. Use inline code formatting for short identifiers.
+8. Keep the summary proportional to the amount of
+   material provided.
+9. If the retrieved material is incomplete, summarize
+   only what is available.
+10. Return Markdown text, not HTML or JSON.
 """
+
 
     response = client.models.generate_content(
         model=PRIMARY_MODEL,

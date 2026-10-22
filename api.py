@@ -1,3 +1,12 @@
+
+import hashlib
+import shutil
+import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+from uuid import uuid4
+
 from fastapi import (
     Depends,
     FastAPI,
@@ -6,35 +15,25 @@ from fastapi import (
     File,
     HTTPException,
 )
-
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
-
-from pathlib import Path
-from datetime import datetime
-import shutil
-import uuid
-from uuid import uuid4
-
-from models import PracticeQuestion
-from ingest import ingest_pdf
 
 from ask import (
     ask_tutor,
     evaluate_answer,
-    generate_practice_question,
+    generate_practice_for_course,
     TutorResponse,
 )
-
-from firebase_config import verify_token
 from database import SessionLocal
-
+from firebase_config import verify_token
+from ingest import ingest_pdf
 from models import (
     User,
     Course,
     Document,
     LearningProgress,
+    PracticeQuestion,
 )
 
 
@@ -288,101 +287,258 @@ def get_courses(
 # UPLOAD PDF
 # ============================================================
 
+
 @app.post("/upload")
 async def upload_pdf(
     file: UploadFile = File(...),
-
-    current_user=Depends(
-        get_current_user
-    )
+    current_user=Depends(get_current_user)
 ):
-
+    # 1. Validate the uploaded PDF
     if file.content_type != "application/pdf":
-
         raise HTTPException(
             status_code=400,
             detail="Only PDF files are allowed."
         )
 
-    user = get_or_create_user(
-        current_user
-    )
+    file_bytes = await file.read()
 
-    course_id = str(
-        uuid.uuid4()
-    )
-
-    document_id = str(
-        uuid.uuid4()
-    )
-
-    file_path = (
-        UPLOAD_DIR /
-        file.filename
-    )
-
-    # --------------------------------------------------------
-    # 1. Save uploaded PDF
-    # --------------------------------------------------------
-
-    with file_path.open(
-        "wb"
-    ) as buffer:
-
-        shutil.copyfileobj(
-            file.file,
-            buffer
+    if not file_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded PDF is empty."
         )
 
-    # --------------------------------------------------------
-    # 2. Create Course + Document
-    # --------------------------------------------------------
+    # 2. Calculate the file hash
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
 
+    user = get_or_create_user(current_user)
+
+    course_id = str(uuid.uuid4())
+    document_id = str(uuid.uuid4())
+
+    safe_filename = Path(
+        file.filename or "uploaded.pdf"
+    ).name
+
+    file_path = UPLOAD_DIR / f"{document_id}_{safe_filename}"
+
+    # 3. Check for duplicate PDFs
     db = SessionLocal()
 
     try:
+        existing_document = (
+            db.query(Document)
+            .join(Course, Document.course_id == Course.id)
+            .filter(
+                Course.user_id == user.id,
+                Document.file_hash == file_hash,
+                Document.status != "failed"
+            )
+            .first()
+        )
 
+        if existing_document:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": (
+                        "This PDF has already been uploaded. "
+                        "Continue learning from your existing course."
+                    ),
+                    "existing_course_id": existing_document.course_id,
+                    "existing_document_id": existing_document.id
+                }
+            )
+
+        # 4. Save the uploaded PDF
+        with file_path.open("wb") as buffer:
+            buffer.write(file_bytes)
+
+        # 5. Create the course
         course = Course(
             id=course_id,
-
             user_id=user.id,
-
-            title=file.filename
+            title=safe_filename
         )
 
         db.add(course)
 
+        # 6. Create the document record
         document = Document(
             id=document_id,
-
             course_id=course_id,
-
-            filename=file.filename,
-
-            file_path=str(
-                file_path
-            ),
-
+            filename=safe_filename,
+            file_hash=file_hash,
+            file_path=str(file_path),
             status="processing"
         )
 
         db.add(document)
-
         db.commit()
 
-    except Exception:
+    except HTTPException:
+        db.rollback()
+        raise
 
+    except Exception:
         db.rollback()
 
-        db.close()
+        if file_path.exists():
+            file_path.unlink()
 
         raise
 
     finally:
+        db.close()
 
-        if db:
+    # 7. Extract concepts and create embeddings
+    try:
+        result = ingest_pdf(
+            str(file_path),
+            user.id,
+            course_id,
+            document_id
+        )
 
+        concepts = result.get("concepts", [])
+
+    except Exception as e:
+        import traceback
+
+        print("PDF processing failed:", repr(e))
+        traceback.print_exc()
+
+        db = SessionLocal()
+
+        try:
+            document = (
+                db.query(Document)
+                .filter(Document.id == document_id)
+                .first()
+            )
+
+            if document:
+                document.status = "failed"
+                db.commit()
+
+        except Exception:
+            db.rollback()
+            traceback.print_exc()
+
+        finally:
             db.close()
+
+        raise HTTPException(
+            status_code=500,
+            detail="PDF uploaded but AI processing failed."
+        )
+
+    # 8. Save concept roadmap and processing results
+    db = SessionLocal()
+
+    try:
+        document = (
+            db.query(Document)
+            .filter(Document.id == document_id)
+            .first()
+        )
+
+        if not document:
+            raise HTTPException(
+                status_code=404,
+                detail="Document record not found."
+            )
+
+        # Initialize progress records for discovered concepts.
+        for item in concepts:
+            topic = item["topic"].strip()
+            concept = item["concept"].strip()
+
+            if not topic or not concept:
+                continue
+
+            existing_progress = (
+                db.query(LearningProgress)
+                .filter(
+                    LearningProgress.user_id == user.id,
+                    LearningProgress.course_id == course_id,
+                    LearningProgress.topic == topic,
+                    LearningProgress.concept == concept
+                )
+                .first()
+            )
+
+            if existing_progress:
+                continue
+
+            progress = LearningProgress(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                course_id=course_id,
+                topic=topic,
+                concept=concept,
+                attempts=0,
+                correct=0,
+                incorrect=0,
+                mastery=0,
+                status="not_started"
+            )
+
+            db.add(progress)
+
+        document.pages = result["pages"]
+        document.chunks = result["chunks"]
+        document.status = "ready"
+
+        db.commit()
+
+        # Return the complete saved roadmap, including existing records.
+        roadmap = (
+            db.query(LearningProgress)
+            .filter(
+                LearningProgress.user_id == user.id,
+                LearningProgress.course_id == course_id
+            )
+            .order_by(
+                LearningProgress.topic,
+                LearningProgress.concept
+            )
+            .all()
+        )
+
+        return {
+            "message": "PDF uploaded and processed successfully.",
+            "course_id": course_id,
+            "document_id": document_id,
+            "filename": safe_filename,
+            "pages": result["pages"],
+            "chunks": result["chunks"],
+            "status": "ready",
+            "concepts_count": len(roadmap),
+            "concepts": [
+                {
+                    "id": item.id,
+                    "topic": item.topic,
+                    "concept": item.concept,
+                    "attempts": item.attempts,
+                    "mastery": item.mastery,
+                    "status": item.status
+                }
+                for item in roadmap
+            ]
+        }
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.close()
+        await file.close()
+
+
+   
+
 
     # --------------------------------------------------------
     # 3. Process PDF / create embeddings
@@ -789,6 +945,7 @@ def generate_course_summary(
 # SAVE LEARNING PROGRESS
 # ============================================================
 
+
 def save_learning_progress(
     user_id: str,
     course_id: str,
@@ -797,127 +954,71 @@ def save_learning_progress(
     is_correct: bool
 ):
     """
-    Create or update learning progress
-    for a specific user, course and concept.
+    Create or update progress for a concept.
+    A concept requires at least 3 attempts and 90% mastery
+    to be marked as mastered.
     """
 
     db = SessionLocal()
 
     try:
-
         progress = (
-            db.query(
-                LearningProgress
-            )
+            db.query(LearningProgress)
             .filter(
-
-                LearningProgress.user_id
-                == user_id,
-
-                LearningProgress.course_id
-                == course_id,
-
-                LearningProgress.topic
-                == topic,
-
-                LearningProgress.concept
-                == concept
+                LearningProgress.user_id == user_id,
+                LearningProgress.course_id == course_id,
+                LearningProgress.topic == topic,
+                LearningProgress.concept == concept
             )
             .first()
         )
 
-        # ----------------------------------------------------
-        # Create progress record
-        # ----------------------------------------------------
-
+        # Create the progress record if it doesn't exist.
         if not progress:
-
             progress = LearningProgress(
-
-                id=str(
-                    uuid.uuid4()
-                ),
-
+                id=str(uuid.uuid4()),
                 user_id=user_id,
-
                 course_id=course_id,
-
                 topic=topic,
-
                 concept=concept,
-
                 attempts=0,
-
                 correct=0,
-
                 incorrect=0,
-
                 mastery=0,
-
-                status="learning"
+                status="not_started"
             )
 
-            db.add(
-                progress
-            )
+            db.add(progress)
 
-        # ----------------------------------------------------
-        # Record attempt
-        # ----------------------------------------------------
-
+        # Record this attempt.
         progress.attempts += 1
 
         if is_correct:
-
             progress.correct += 1
-
         else:
-
             progress.incorrect += 1
 
-        # ----------------------------------------------------
-        # Calculate mastery
-        # ----------------------------------------------------
-
+        # Calculate mastery as the percentage of correct answers.
         progress.mastery = round(
-            (
-                progress.correct /
-                progress.attempts
-            ) * 100
+            (progress.correct / progress.attempts) * 100
         )
 
-        # ----------------------------------------------------
-        # Determine learning state
-        # ----------------------------------------------------
-
-        if progress.mastery < 50:
-
-            progress.status = "weak"
-
-        elif progress.mastery < 80:
-
+        # Update the learning status.
+        if progress.attempts >= 3 and progress.mastery >= 90:
+            progress.status = "mastered"
+        else:
             progress.status = "learning"
 
-        else:
-
-            progress.status = "strong"
-
         db.commit()
-
-        db.refresh(
-            progress
-        )
+        db.refresh(progress)
 
         return progress
 
     except Exception:
-
         db.rollback()
-
         raise
 
     finally:
-
         db.close()
 
 
@@ -1083,12 +1184,15 @@ def evaluate_student_answer(
 # ============================================================
 # Practice API
 # ============================================================
+
+class PracticeRequest(BaseModel):
+    topic: str | None = None
+    concept: str | None = None
+
 @app.post("/practice/{course_id}")
-
-
-
 def generate_practice(
     course_id: str,
+    request: PracticeRequest,
     current_user=Depends(get_current_user)
 ):
     user = get_or_create_user(current_user)
@@ -1110,28 +1214,29 @@ def generate_practice(
                 detail="Course not found"
             )
 
-        practice = generate_practice_question(
+        practice = generate_practice_for_course(
             course_id=course_id,
-            user_id=user.id
+            user_id=user.id,
+            topic=request.topic,
+            concept=request.concept,
         )
 
         saved_question = PracticeQuestion(
             id=str(uuid4()),
             user_id=user.id,
             course_id=course_id,
-            topic=practice.topic,
-            concept=practice.concept,
-            quiz_question=practice.quiz_question,
-            expected_answer=practice.expected_answer,
-            quiz_explanation=practice.quiz_explanation,
-            status="pending"
+            topic=practice["topic"],
+            concept=practice["concept"],
+            quiz_question=practice["quiz_question"],
+            expected_answer=practice["expected_answer"],
+            quiz_explanation=practice["quiz_explanation"],
+            status="pending",
         )
 
         db.add(saved_question)
         db.commit()
         db.refresh(saved_question)
 
-        # Do not send the expected answer to the browser.
         return {
             "id": saved_question.id,
             "course_id": saved_question.course_id,
@@ -1146,7 +1251,7 @@ def generate_practice(
         db.rollback()
         raise
 
-    except Exception as e:
+    except Exception:
         db.rollback()
         import traceback
         traceback.print_exc()
@@ -1158,6 +1263,7 @@ def generate_practice(
 
     finally:
         db.close()
+
 
 
 # ============================================================
@@ -1333,7 +1439,12 @@ def get_learning_progress(
                     "correct": item.correct,
                     "incorrect": item.incorrect,
                     "mastery": item.mastery,
-                    "status": item.status
+                    "status": item.status,
+                    "updated_at": (
+                        item.updated_at.isoformat()
+                        if item.updated_at
+                        else None
+                    )
                 }
                 for item in progress_records
             ]

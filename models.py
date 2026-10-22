@@ -55,6 +55,13 @@ class Document(Base):
     course_id = Column(String, ForeignKey("courses.id"), nullable=False)
 
     filename = Column(String, nullable=False)
+    
+    file_hash = Column(
+        String(64),
+        nullable=True,
+        index=True
+    )
+    
     pages = Column(Integer, default=0)
     chunks = Column(Integer, default=0)
     file_path = Column(String, nullable=False)

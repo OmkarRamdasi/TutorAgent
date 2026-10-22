@@ -108,3 +108,48 @@ body,
 .learnai-primary-text {
   color: var(--learnai-primary);
 }
+
+
+/* =========================
+   AI Generation Glow
+   ========================= */
+
+.ai-generating-dark {
+  border-color: rgba(168, 85, 247, 0.9) !important;
+  animation: ai-glow-pulse-dark 1.6s ease-in-out infinite;
+}
+
+.ai-generating-light {
+  border-color: rgba(139, 92, 246, 0.75) !important;
+  animation: ai-glow-pulse-light 1.6s ease-in-out infinite;
+}
+
+@keyframes ai-glow-pulse-dark {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(168, 85, 247, 0.12);
+  }
+  50% {
+    box-shadow:
+      0 0 10px rgba(168, 85, 247, 0.35),
+      0 0 22px rgba(139, 92, 246, 0.18);
+  }
+}
+
+@keyframes ai-glow-pulse-light {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(139, 92, 246, 0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 10px rgba(139, 92, 246, 0.2),
+      0 0 20px rgba(139, 92, 246, 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-generating-dark,
+  .ai-generating-light {
+    animation: none;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+  }
+}

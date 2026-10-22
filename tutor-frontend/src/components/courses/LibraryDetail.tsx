@@ -17,8 +17,10 @@ import { useCourses } from "../../context/CourseContext";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { LibraryDetailSkeleton, InlineError } from "../ui/Skeleton";
-import { useProgress } from "../../context/ProgressContext";
+import { useProgress, getRecommendedConcept, } from "../../context/ProgressContext";
 import Tutor from "../tutor/Tutor";
+import { useTutor } from "../../context/TutorContext";
+import { usePractice } from "../../context/PracticeContext";
 
 export default function LibraryDetail() {
   const { courseId } = useParams();
@@ -26,6 +28,24 @@ export default function LibraryDetail() {
   const { user } = useAuth();
   const { darkMode } = useTheme();
 
+  const { askingTutor, setQuestion, resetTutorSession } = useTutor();
+  const [selectedTopic, setSelectedTopic] = useState("");
+  const [selectedConcept, setSelectedConcept] = useState("");
+
+  const handleLearnConcept = (topic: string, concept: string) => {
+    resetTutorSession();
+    setSelectedTopic(topic);
+    setSelectedConcept(concept);
+    const prompt =
+      `Teach me "${concept}" under the topic "${topic}" ` +
+      `using my uploaded course material. Explain it step by step, ` +
+      `provide an example, and ask a quick-check question.`;
+
+    setQuestion(prompt);
+  };
+  const { practiceLoading } = usePractice();
+
+  const isGeneratingAI = askingTutor || practiceLoading;
   const {
     courses,
     loadingCourses,
@@ -152,6 +172,7 @@ export default function LibraryDetail() {
     (total, item) => total + item.attempts,
     0
   );
+  const recommendedConcept = getRecommendedConcept(progress);
 
   return (
     <div className={pageClass}>
@@ -362,6 +383,12 @@ export default function LibraryDetail() {
 
                 <div className="min-w-0 flex-1">
                   <h2 className="font-semibold">Learning Journey</h2>
+                  {askingTutor && (
+                    <p className="mt-4 flex items-center gap-2 text-sm text-purple-500">
+                      <Sparkles size={15} className="animate-pulse" />
+                      Preparing your lesson…
+                    </p>
+                  )}
                   <p className={`mt-1 text-sm leading-6 ${mutedText}`}>
                     Track mastery and review your progress across concepts.
                   </p>
@@ -409,47 +436,152 @@ export default function LibraryDetail() {
                   </div>
 
                   <div className="mt-5 space-y-4">
-                    {progress.slice(0, 4).map((item) => {
-                      const mastery = Math.min(
-                        100,
-                        Math.max(0, item.mastery)
-                      );
+                    {[...progress]
+                      .sort((a, b) => {
+                        const timeA = a.updated_at
+                          ? new Date(a.updated_at).getTime()
+                          : 0;
 
-                      return (
-                        <div
-                          key={`${item.topic}-${item.concept}`}
-                          className={`border-t pt-4 ${darkMode
-                            ? "border-white/10"
-                            : "border-(--learnai-primary-soft)"
-                            }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className={`text-xs ${mutedText}`}>
-                                {item.topic}
-                              </p>
-                              <p className="mt-1 text-sm font-medium">
-                                {item.concept}
-                              </p>
-                            </div>
-                            <span className="shrink-0 text-sm font-semibold">
-                              {mastery}%
-                            </span>
-                          </div>
+                        const timeB = b.updated_at
+                          ? new Date(b.updated_at).getTime()
+                          : 0;
 
-                          <div
-                            className={`mt-3 h-1.5 overflow-hidden rounded-full ${darkMode ? "bg-zinc-800" : "bg-zinc-200"
+                        return timeB - timeA;
+                      })
+                      .map((item) => {
+                        const mastery = Math.min(
+                          100,
+                          Math.max(0, item.mastery)
+                        );
+                        const masteryLabel =
+                          mastery >= 80
+                            ? "Strong"
+                            : mastery >= 50
+                              ? "Learning"
+                              : "Needs practice";
+
+                        return (
+                          <button
+                            key={`${item.topic}-${item.concept}`}
+                            type="button"
+                            disabled={askingTutor}
+                            onClick={() =>
+                              void handleLearnConcept(item.topic, item.concept)
+                            }
+                            className={`group w-full rounded-xl border p-4 text-left
+ transition-all duration-200
+    border-transparent
+    hover:border-purple-500
+    hover:bg-purple-500/5
+    focus-visible:outline-2
+    focus-visible:outline-purple-500
+    disabled:cursor-not-allowed
+    disabled:opacity-50
+    ${darkMode
+                                ? "bg-white/[0.02]"
+                                : "bg-black/[0.02]"
                               }`}
                           >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className={`text-xs ${mutedText}`}>
+                                  {item.topic}
+                                </p>
+                                <p className="mt-1 text-sm font-medium">
+                                  {item.concept}
+                                </p>
+
+                                <p
+                                  className={`mt-1 text-xs font-medium ${mastery >= 80
+                                    ? darkMode
+                                      ? "text-emerald-400"
+                                      : "text-emerald-700"
+                                    : mastery >= 50
+                                      ? darkMode
+                                        ? "text-amber-400"
+                                        : "text-amber-700"
+                                      : darkMode
+                                        ? "text-zinc-400"
+                                        : "text-zinc-500"
+                                    }`}
+                                >
+                                  {masteryLabel}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 flex-col items-end gap-2">
+                                <span className="text-sm font-semibold">
+                                  {mastery}%
+                                </span>
+
+                                <span
+                                  className="inline-flex items-center gap-1
+      text-xs font-medium text-purple-500
+      opacity-0 transition-opacity duration-200
+      group-hover:opacity-100
+      group-focus-visible:opacity-100"
+                                >
+                                  Learn
+                                  <ArrowRight size={13} />
+                                </span>
+                              </div>
+                            </div>
+
                             <div
-                              className={`h-full rounded-full ${darkMode ? "bg-white" : "bg-black"
+                              className={`mt-3 h-1.5 overflow-hidden rounded-full ${darkMode ? "bg-zinc-800" : "bg-zinc-200"
                                 }`}
-                              style={{ width: `${mastery}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                            >
+                              <div
+                                className={`h-full rounded-full ${darkMode ? "bg-white" : "bg-black"
+                                  }`}
+                                style={{ width: `${mastery}%` }}
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
+
+
+                    {recommendedConcept && (
+                      <div
+                        className={`mt-4 rounded-xl border p-4 ${darkMode
+                          ? "border-white/10 bg-white/[0.03]"
+                          : "border-zinc-200 bg-zinc-50"
+                          }`}
+                      >
+                        <p
+                          className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? "text-zinc-400" : "text-zinc-500"
+                            }`}
+                        >
+                          Recommended next
+                        </p>
+
+                        <h3 className="mt-2 font-semibold">
+                          {recommendedConcept.concept}
+                        </h3>
+
+                        <p className={`mt-1 text-sm ${mutedText}`}>
+                          {recommendedConcept.topic} · {recommendedConcept.mastery}% mastery
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              `/app/tutor/${courseId}?concept=${encodeURIComponent(
+                                recommendedConcept.concept
+                              )}`
+                            )
+                          }
+                          className={`mt-3 inline-flex items-center gap-2 text-sm font-medium ${darkMode
+                            ? "text-white hover:text-zinc-300"
+                            : "text-black hover:text-zinc-600"
+                            }`}
+                        >
+                          Continue learning
+                          <ArrowRight size={15} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -470,31 +602,75 @@ export default function LibraryDetail() {
 
           {/* RIGHT: AI TUTOR WITH ASK / PRACTICE */}
 
-          <section className={`flex min-w-0 flex-col overflow-hidden rounded-2xl border ${cardClass} xl:h-full`}>
+          <section
+            className={`flex min-w-0 flex-col overflow-hidden rounded-2xl border  ${cardClass} xl:h-full ${isGeneratingAI
+              ? darkMode
+                ? "ai-generating-dark"
+                : "ai-generating-light"
+              : ""
+              }`}
+          >
+
+
             <div
-              className={`border-b p-4 sm:p-5 ${darkMode
+              className={`border-b px-5 py-5 sm:px-6 ${darkMode
                 ? "border-white/10"
-                : "border-(--learnai-primary-soft)"
+                : "border-gray-200"
                 }`}
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${darkMode ? "bg-white/10" : "bg-[#F5F5F5]"
-                    }`}
-                >
-                  <Sparkles size={19} strokeWidth={1.7} />
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                {/* Assistant identity */}
+                <div className="flex min-w-0 items-center gap-3">
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${darkMode
+                      ? "bg-white/10 text-purple-300"
+                      : "bg-purple-50 text-purple-600"
+                      }`}
+                  >
+                    <Sparkles size={21} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <h2 className="text-base font-semibold tracking-tight">
+                      AI Learning Assistant
+                    </h2>
+                    <p
+                      className={`mt-1 text-sm ${darkMode ? "text-gray-400" : "text-gray-500"
+                        }`}
+                    >
+                      Ask questions or practise concepts
+                    </p>
+                  </div>
                 </div>
 
-                <div className="min-w-0">
-                  <h2 className="font-semibold">
-                    AI Learning Assistant
-                  </h2>
-                  <p className={`mt-1 text-xs ${mutedText}`}>
-                    Ask questions or practise concepts
-                  </p>
-                </div>
+                {/* Selected learning context */}
+                {selectedTopic && selectedConcept && (
+                  <div
+                    className={`min-w-0 rounded-xl border px-3.5 py-2.5 sm:max-w-[280px] ${darkMode
+                      ? "border-purple-400/20 bg-purple-400/[0.06]"
+                      : "border-purple-200 bg-purple-50/70"
+                      }`}
+                  >
+                    <p
+                      className={`truncate text-xs ${darkMode ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      title={selectedTopic}
+                    >
+                      {selectedTopic}
+                    </p>
+
+                    <p
+                      className="mt-1 text-sm font-medium leading-5 text-purple-500"
+                      title={selectedConcept}
+                    >
+                      {selectedConcept}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
+
+
 
             <div
               className={`min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain ${darkMode ? "scrollbar-dark" : "scrollbar-light"

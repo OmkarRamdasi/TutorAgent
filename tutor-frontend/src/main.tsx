@@ -18,14 +18,13 @@ createRoot(document.getElementById("root")!).render(
         <ThemeProvider>
           <AuthProvider>
             <CourseProvider>
-              <TutorProvider>
-                <PracticeProvider>
-                  <ProgressProvider>
+              <ProgressProvider>
+                <TutorProvider>
+                  <PracticeProvider>
                     <App />
-                  </ProgressProvider>
-                </PracticeProvider>
-
-              </TutorProvider>
+                  </PracticeProvider>
+                </TutorProvider>
+              </ProgressProvider>
             </CourseProvider>
           </AuthProvider>
         </ThemeProvider>

@@ -47,7 +47,8 @@ export default function Practice({
         evaluatingAnswer,
         evaluation,
         evaluationError,
-        clearEvaluation
+        clearEvaluation,
+        tutorResponse,
     } = useTutor();
 
     const {
@@ -91,7 +92,12 @@ export default function Practice({
         }
 
         try {
-            await generatePractice(courseId);
+            await generatePractice(
+                courseId,
+                tutorResponse?.topic,
+                tutorResponse?.concept
+            );
+
             setStudentAnswer("");
             setSubmitted(false);
         } catch (error) {

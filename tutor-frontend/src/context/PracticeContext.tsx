@@ -46,7 +46,9 @@ interface PracticeContextType {
     setSubmitted: (submitted: boolean) => void;
 
     generatePractice: (
-        courseId: string
+        courseId: string,
+        topic?: string,
+        concept?: string
     ) => Promise<PracticeQuestion>;
 
     fetchPracticeHistory: (
@@ -136,8 +138,11 @@ export function PracticeProvider({
         }
     };
 
+
     const generatePractice = async (
-        courseId: string
+        courseId: string,
+        topic?: string,
+        concept?: string
     ): Promise<PracticeQuestion> => {
         if (!user) {
             throw new Error("Please log in first.");
@@ -145,9 +150,6 @@ export function PracticeProvider({
 
         setPracticeLoading(true);
         setPracticeError("");
-
-        // Do not clear the current question here.
-        // Keep existing history while generating another question.
 
         try {
             const token = await user.getIdToken();
@@ -157,8 +159,13 @@ export function PracticeProvider({
                 {
                     method: "POST",
                     headers: {
+                        "Content-Type": "application/json",
                         Authorization: `Bearer ${token}`,
                     },
+                    body: JSON.stringify({
+                        topic: topic ?? null,
+                        concept: concept ?? null,
+                    }),
                 }
             );
 
@@ -174,8 +181,9 @@ export function PracticeProvider({
             const newQuestion: PracticeQuestion = data;
 
             setPracticeQuestion(newQuestion);
+            setStudentAnswer("");
+            setSubmitted(false);
 
-            // Immediately add the new question to local history.
             setPracticeHistory((previous) => [
                 {
                     id: newQuestion.id,
@@ -209,6 +217,7 @@ export function PracticeProvider({
             setPracticeLoading(false);
         }
     };
+
 
     const clearPractice = () => {
         setPracticeQuestion(null);

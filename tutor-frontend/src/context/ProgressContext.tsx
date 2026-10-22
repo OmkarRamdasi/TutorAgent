@@ -17,6 +17,7 @@ export interface LearningProgress {
   incorrect: number;
   mastery: number;
   status: string;
+  updated_at?: string | null;
 }
 
 interface ProgressContextType {

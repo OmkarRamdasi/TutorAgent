@@ -170,7 +170,7 @@ export default function LearningJourney() {
                     </div>
                 ) : (
                     <>
-                        <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="grid gap-4 sm:grid-cols-3 mb-8">
                             {[
                                 {
                                     label: "Average mastery",
@@ -233,8 +233,8 @@ export default function LearningJourney() {
                                             )
                                         }
                                         className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${darkMode
-                                                ? "bg-white text-black hover:bg-zinc-200"
-                                                : "bg-black text-white hover:bg-zinc-800"
+                                            ? "bg-white text-black hover:bg-zinc-200"
+                                            : "bg-black text-white hover:bg-zinc-800"
                                             }`}
                                     >
                                         Review this concept
@@ -260,6 +260,12 @@ export default function LearningJourney() {
                                         100,
                                         Math.max(0, item.mastery)
                                     );
+                                    const masteryLabel =
+                                        mastery >= 80
+                                            ? "Strong"
+                                            : mastery >= 50
+                                                ? "Learning"
+                                                : "Needs practice";
 
                                     return (
                                         <div
@@ -286,12 +292,20 @@ export default function LearningJourney() {
                                                     </p>
 
                                                     <p
-                                                        className={`mt-1 text-xs capitalize ${darkMode
-                                                            ? "text-zinc-400"
-                                                            : "text-zinc-500"
+                                                        className={`mt-1 text-xs font-medium ${mastery >= 80
+                                                                ? darkMode
+                                                                    ? "text-emerald-400"
+                                                                    : "text-emerald-700"
+                                                                : mastery >= 50
+                                                                    ? darkMode
+                                                                        ? "text-amber-400"
+                                                                        : "text-amber-700"
+                                                                    : darkMode
+                                                                        ? "text-zinc-400"
+                                                                        : "text-zinc-500"
                                                             }`}
                                                     >
-                                                        {item.status}
+                                                        {masteryLabel}
                                                     </p>
                                                 </div>
                                             </div>

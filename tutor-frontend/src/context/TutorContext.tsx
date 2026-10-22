@@ -6,6 +6,8 @@ import {
 } from "react";
 
 import { useAuth } from "./AuthContext";
+import { useProgress } from "./ProgressContext";
+
 
 interface TutorResponse {
   topic: string;
@@ -62,6 +64,7 @@ interface TutorContextType {
   setQuickCheckAnswer: (answer: string) => void;
 
   clearEvaluation: () => void;
+  resetTutorSession: () => void;
 }
 
 const TutorContext =
@@ -77,6 +80,7 @@ export function TutorProvider({
   children,
 }: TutorProviderProps) {
   const { user } = useAuth();
+  const { fetchProgress } = useProgress();
 
   const [question, setQuestion] =
     useState("");
@@ -107,6 +111,15 @@ export function TutorProvider({
     setEvaluationError("");
   };
 
+  const resetTutorSession = () => {
+    setTutorResponse(null);
+    setTutorError("");
+    setEvaluation(null);
+    setEvaluationError("");
+    setQuickCheckAnswer("");
+    setQuestion("");
+  };
+
   // ============================================================
   // ASK TUTOR
   // ============================================================
@@ -122,10 +135,12 @@ export function TutorProvider({
       );
     }
 
+    setQuestion(question);
     setAskingTutor(true);
     setTutorError("");
     setEvaluation(null);
     setEvaluationError("");
+    setQuickCheckAnswer("");
 
     try {
 
@@ -263,6 +278,9 @@ export function TutorProvider({
 
       setEvaluation(data);
 
+      // Refresh the Learning Journey after a successful evaluation.
+      await fetchProgress(user, courseId);
+
       return data;
     } catch (error) {
       const message =
@@ -311,6 +329,7 @@ export function TutorProvider({
         setQuickCheckAnswer,
 
         clearEvaluation,
+        resetTutorSession
       }}
     >
       {children}

@@ -49,19 +49,22 @@ export default function UploadCard() {
         description: `Pages: ${result.pages} • Chunks: ${result.chunks}`,
       });
       setSelectedFile(null);
-    } catch (error) {
-      console.error("Upload failed:", error);
-      toast.error(error instanceof Error ? error.message : "Something went wrong while uploading.");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to upload PDF.";
+
+      toast.error(message);
     }
   };
 
   return (
     <div
-      className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${
-        darkMode
-          ? "border-zinc-700 bg-zinc-900/40 hover:border-zinc-500"
-          : "border-zinc-200 bg-white hover:border-black"
-      }`}
+      className={`rounded-2xl border-2 border-dashed p-10 text-center transition ${darkMode
+        ? "border-zinc-700 bg-zinc-900/40 hover:border-zinc-500"
+        : "border-zinc-200 bg-white hover:border-black"
+        }`}
     >
       <div className={darkMode ? "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white" : "mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-100 text-black"}>
         <Upload size={22} strokeWidth={1.8} />
@@ -86,11 +89,10 @@ export default function UploadCard() {
 
       <label
         htmlFor="pdf-upload"
-        className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition ${
-          darkMode
-            ? "bg-white text-black hover:bg-zinc-200"
-            : "bg-black text-white hover:bg-zinc-800"
-        } ${uploading ? "pointer-events-none opacity-50" : ""}`}
+        className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition ${darkMode
+          ? "bg-white text-black hover:bg-zinc-200"
+          : "bg-black text-white hover:bg-zinc-800"
+          } ${uploading ? "pointer-events-none opacity-50" : ""}`}
       >
         <FileText size={16} />
         Choose PDF
