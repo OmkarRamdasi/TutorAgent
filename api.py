@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
+import os
 
 from fastapi import (
     Depends,
@@ -42,6 +43,15 @@ app = FastAPI()
 security = HTTPBearer()
 
 
+frontend_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "FRONTEND_ORIGINS",
+        "http://localhost:5173"
+    ).split(",")
+    if origin.strip()
+]
+
 # ============================================================
 # REQUEST MODELS
 # ============================================================
@@ -72,9 +82,7 @@ class EvaluateRequest(BaseModel):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173"
-    ],
+    allow_origins=frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
