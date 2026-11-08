@@ -1,3 +1,4 @@
+
 import os
 
 from dotenv import load_dotenv
@@ -7,24 +8,39 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
 
-DATABASE_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not DATABASE_PASSWORD:
-    raise ValueError("POSTGRES_PASSWORD is not set in .env")
+if DATABASE_URL:
+    # Neon PostgreSQL connection
+    if DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = DATABASE_URL.replace(
+            "postgresql://",
+            "postgresql+psycopg://",
+            1
+        )
+else:
+    # Local PostgreSQL fallback
+    DATABASE_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 
-DATABASE_URL = URL.create(
-    drivername="postgresql+psycopg",
-    username="postgres",
-    password=DATABASE_PASSWORD,
-    host="localhost",
-    port=5433,
-    database="learnai",
-)
+    if not DATABASE_PASSWORD:
+        raise ValueError(
+            "Set DATABASE_URL or POSTGRES_PASSWORD"
+        )
+
+    DATABASE_URL = URL.create(
+        drivername="postgresql+psycopg",
+        username="postgres",
+        password=DATABASE_PASSWORD,
+        host="localhost",
+        port=5433,
+        database="learnai",
+    )
 
 engine = create_engine(
     DATABASE_URL,
-    echo=True,
-    connect_args={"connect_timeout": 5},
+    echo=False,
+    pool_pre_ping=True,
+    connect_args={"connect_timeout": 10},
 )
 
 SessionLocal = sessionmaker(
