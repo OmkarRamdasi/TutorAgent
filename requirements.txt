@@ -6,3 +6,4 @@ pymupdf
 python-dotenv
 sqlalchemy
 psycopg[binary]
+firebase-admin
