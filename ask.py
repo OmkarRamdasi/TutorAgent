@@ -5,7 +5,6 @@ import random
 from pathlib import Path
 from sqlalchemy import func
 
-import chromadb
 from dotenv import load_dotenv
 from google import genai
 from pydantic import BaseModel, Field
@@ -28,15 +27,6 @@ client = genai.Client(
 PRIMARY_MODEL = "gemini-3.8-flash"
 FALLBACK_MODEL = "gemini-3.6-flash"
 
-# ChromaDB client
-chroma_client = chromadb.PersistentClient(
-    path="./chroma_db"
-)
-
-# Existing course collection
-collection = chroma_client.get_collection(
-    name="data_science_course"
-)
 
 
 # ============================================================
@@ -616,37 +606,26 @@ def record_progress(
 # 1. RETRIEVE
 # ============================================================
 
+
 def retrieve(
     question,
     course_id,
     number_of_chunks=2
 ):
     """
-    Convert the student's question into an embedding
-    and retrieve the most relevant course material
-    from ChromaDB.
-
+    Retrieve relevant course material from Neon pgvector.
     Retrieval is restricted to the selected course.
     """
 
-    result = client.models.embed_content(
-        model="gemini-embedding-2",
-        contents=question
+    results = retrieve_chunks(
+        question=question,
+        course_id=course_id,
+        top_k=number_of_chunks
     )
 
-    question_embedding = result.embeddings[0].values
+    documents = results.get("documents", [[]])[0]
 
-    results = collection.query(
-        query_embeddings=[
-            question_embedding
-        ],
-        n_results=number_of_chunks,
-        where={
-            "course_id": course_id
-        }
-    )
-
-    return results["documents"][0]
+    return documents
 
 
 # ============================================================

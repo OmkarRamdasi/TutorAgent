@@ -1,13 +1,18 @@
 
 import os
 import pymupdf
-import chromadb
 import uuid
 import hashlib
 import re
 import json
+
 from dotenv import load_dotenv
 from google import genai
+from sqlalchemy.orm import Session
+from sqlalchemy import select, func
+
+from database import engine
+from models import DocumentChunk
 
 
 # -----------------------------
@@ -24,18 +29,6 @@ load_dotenv()
 
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
-)
-
-
-# -----------------------------
-# ChromaDB
-# -----------------------------
-chroma_client = chromadb.PersistentClient(
-    path="./chroma_db"
-)
-
-collection = chroma_client.get_or_create_collection(
-    name="data_science_course"
 )
 
 
@@ -92,12 +85,10 @@ def create_chunks(pages):
 # Text normalization and hashing
 # -----------------------------
 def normalize_text(text: str) -> str:
-    """Normalize text for comparison."""
     return re.sub(r"\s+", " ", text).strip().casefold()
 
 
 def create_text_hash(text: str) -> str:
-    """Create a stable hash of normalized text."""
     normalized = normalize_text(text)
 
     return hashlib.sha256(
@@ -114,13 +105,19 @@ def create_embedding(text):
         contents=text
     )
 
-    return result.embeddings[0].values
+    embedding = result.embeddings[0].values
+
+    if len(embedding) != 3072:
+        raise ValueError(
+            f"Expected 3072 embedding dimensions, got {len(embedding)}"
+        )
+
+    return embedding
 
 
 # -----------------------------
-# Identify concept in a chunk
+# Identify concepts in a chunk
 # -----------------------------
-
 def identify_chunk_concept(text: str) -> dict:
     prompt = f"""
 You are an expert learning-content analyst.
@@ -180,9 +177,8 @@ Source text:
 
 
 # -----------------------------
-# Ingest PDF and collect roadmap concepts
+# Ingest PDF into Neon pgvector
 # -----------------------------
-
 def ingest_pdf(pdf_path, user_id, course_id, document_id):
     print(f"\nIngesting: {pdf_path}")
 
@@ -194,113 +190,119 @@ def ingest_pdf(pdf_path, user_id, course_id, document_id):
     chunks = create_chunks(pages)
     print("Chunks:", len(chunks))
 
-    # 3. Load existing user chunks for duplicate detection
-    existing = collection.get(
-        where={"user_id": user_id},
-        include=["documents"]
-    )
-
-    existing_hashes = {
-        create_text_hash(text)
-        for text in (existing.get("documents") or [])
-        if text
-    }
-
     stored_chunks = 0
     skipped_chunks = 0
-
-    # Unique concepts identified in this PDF
     roadmap_concepts = {}
 
-    # 4. Process each chunk
-    for index, chunk in enumerate(chunks):
-        chunk_text = chunk["text"]
-        chunk_hash = create_text_hash(chunk_text)
+    # 3. Connect to Neon
+    with Session(engine) as session:
 
+        # Load existing hashes for this user
+        existing_hashes = set(
+            session.scalars(
+                select(DocumentChunk.content_hash).where(
+                    DocumentChunk.user_id == user_id
+                )
+            ).all()
+        )
+
+        # 4. Process each chunk
         try:
-            # Extract all concepts from this chunk
-            concept_info = identify_chunk_concept(chunk_text)
-            concepts = concept_info.get("concepts", [])
+            for index, chunk in enumerate(chunks):
+                chunk_text = chunk["text"]
+                chunk_hash = create_text_hash(chunk_text)
 
-            # Collect and deduplicate concepts
-            for item in concepts:
-                topic = item["topic"].strip()
-                concept = item["concept"].strip()
+                # Extract concepts
+                concept_info = identify_chunk_concept(chunk_text)
+                concepts = concept_info.get("concepts", [])
 
-                if not topic or not concept:
+                # Collect unique concepts
+                for item in concepts:
+                    topic = item["topic"].strip()
+                    concept = item["concept"].strip()
+
+                    if not topic or not concept:
+                        continue
+
+                    key = (
+                        normalize_text(topic),
+                        normalize_text(concept)
+                    )
+
+                    if key not in roadmap_concepts:
+                        roadmap_concepts[key] = {
+                            "topic": topic,
+                            "concept": concept
+                        }
+
+                # Skip duplicate chunks
+                if chunk_hash in existing_hashes:
+                    skipped_chunks += 1
+
+                    print(
+                        f"Skipped duplicate chunk "
+                        f"{index + 1}/{len(chunks)}"
+                    )
                     continue
 
-                key = (
-                    normalize_text(topic),
-                    normalize_text(concept)
-                )
+                # Generate embedding
+                embedding = create_embedding(chunk_text)
 
-                if key not in roadmap_concepts:
-                    roadmap_concepts[key] = {
-                        "topic": topic,
-                        "concept": concept
+                # Primary concept for this chunk
+                primary_concept = (
+                    concepts[0]
+                    if concepts
+                    else {
+                        "topic": "General",
+                        "concept": "Unclassified content"
                     }
-
-            # Avoid storing duplicate text chunks
-            if chunk_hash in existing_hashes:
-                skipped_chunks += 1
-                print(
-                    f"Skipped duplicate chunk "
-                    f"{index + 1}/{len(chunks)}"
                 )
-                continue
 
-            # Generate embedding for the chunk
-            embedding = create_embedding(chunk_text)
+                # Store in Neon
+                document_chunk = DocumentChunk(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    course_id=course_id,
+                    document_id=document_id,
+                    page=chunk["page_number"],
+                    content=chunk_text,
+                    embedding=embedding,
+                    content_hash=chunk_hash,
+                    topic=primary_concept["topic"],
+                    concept=primary_concept["concept"]
+                )
 
-            # Keep the first concept in metadata for compatibility
-            # with the existing retrieval system.
-            primary_concept = (
-                concepts[0]
-                if concepts
-                else {
-                    "topic": "General",
-                    "concept": "Unclassified content"
-                }
-            )
+                session.add(document_chunk)
 
-            collection.add(
-                ids=[str(uuid.uuid4())],
-                documents=[chunk_text],
-                embeddings=[embedding],
-                metadatas=[{
-                    "user_id": user_id,
-                    "course_id": course_id,
-                    "document_id": document_id,
-                    "page": chunk["page_number"],
-                    "source": pdf_path,
-                    "content_hash": chunk_hash,
-                    "topic": primary_concept["topic"],
-                    "concept": primary_concept["concept"]
-                }]
-            )
+                existing_hashes.add(chunk_hash)
+                stored_chunks += 1
 
-            existing_hashes.add(chunk_hash)
-            stored_chunks += 1
+                print(
+                    f"Processed chunk {index + 1}/{len(chunks)} "
+                    f"| Concepts found: {len(concepts)}"
+                )
 
-            print(
-                f"Processed chunk {index + 1}/{len(chunks)} "
-                f"| Concepts found: {len(concepts)}"
-            )
+            # Commit all newly stored chunks
+            session.commit()
 
         except Exception as e:
-            print(
-                f"Failed to process chunk "
-                f"{index + 1}/{len(chunks)}: {e}"
-            )
-            raise
+            session.rollback()
 
-    # 5. Build the unique concept list
+            print("Ingestion failed. Database changes rolled back.")
+            raise e
+
+        # Count all stored chunks
+        total_documents = session.scalar(
+            select(func.count()).select_from(DocumentChunk)
+        )
+
+    # 5. Build unique concept list
     concepts = list(roadmap_concepts.values())
 
     print("\nIngestion finished!")
     print("New chunks stored:", stored_chunks)
     print("Duplicate chunks skipped:", skipped_chunks)
+    print("Total chunks in database:", total_documents)
     print("Unique concepts identified:", len(concepts))
 
     for item in concepts:
@@ -313,7 +315,7 @@ def ingest_pdf(pdf_path, user_id, course_id, document_id):
         "pages": len(pages),
         "chunks": stored_chunks,
         "duplicate_chunks_skipped": skipped_chunks,
-        "total_documents": collection.count(),
+        "total_documents": total_documents,
         "concepts": concepts
     }
 
@@ -324,33 +326,32 @@ def ingest_pdf(pdf_path, user_id, course_id, document_id):
 def find_existing_concept(user_id: str, topic: str, concept: str):
     """Find chunks for this user with the same topic and concept."""
 
-    results = collection.get(
-        where={"user_id": user_id},
-        include=["metadatas"]
-    )
-
     normalized_topic = normalize_text(topic)
     normalized_concept = normalize_text(concept)
 
-    matches = []
+    with Session(engine) as session:
 
-    for metadata in results.get("metadatas") or []:
-        existing_topic = normalize_text(
-            metadata.get("topic", "")
-        )
-        existing_concept = normalize_text(
-            metadata.get("concept", "")
-        )
+        results = session.scalars(
+            select(DocumentChunk).where(
+                DocumentChunk.user_id == user_id
+            )
+        ).all()
 
-        if (
-            existing_topic == normalized_topic
-            and existing_concept == normalized_concept
-        ):
-            matches.append({
-                "course_id": metadata.get("course_id"),
-                "document_id": metadata.get("document_id"),
-                "topic": metadata.get("topic"),
-                "concept": metadata.get("concept")
-            })
+        matches = []
 
-    return matches
+        for item in results:
+            existing_topic = normalize_text(item.topic or "")
+            existing_concept = normalize_text(item.concept or "")
+
+            if (
+                existing_topic == normalized_topic
+                and existing_concept == normalized_concept
+            ):
+                matches.append({
+                    "course_id": item.course_id,
+                    "document_id": item.document_id,
+                    "topic": item.topic,
+                    "concept": item.concept
+                })
+
+        return matches

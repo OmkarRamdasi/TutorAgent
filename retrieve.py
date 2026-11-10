@@ -1,9 +1,14 @@
-import os
 
-import chromadb
+import os
+import json
+
 from dotenv import load_dotenv
 from google import genai
-import json
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+
+from database import engine
+from models import DocumentChunk
 
 
 # -----------------------------
@@ -18,19 +23,6 @@ client = genai.Client(
 
 
 # -----------------------------
-# ChromaDB
-# -----------------------------
-
-chroma_client = chromadb.PersistentClient(
-    path="./chroma_db"
-)
-
-collection = chroma_client.get_or_create_collection(
-    name="data_science_course"
-)
-
-
-# -----------------------------
 # Create embedding
 # -----------------------------
 
@@ -41,10 +33,22 @@ def create_embedding(text):
         contents=text
     )
 
-    return result.embeddings[0].values
+    embedding = result.embeddings[0].values
 
+    if len(embedding) != 3072:
+        raise ValueError(
+            f"Expected 3072 embedding dimensions, got {len(embedding)}"
+        )
+
+    return embedding
+
+
+# -----------------------------
+# Identify chunk concept
+# -----------------------------
 
 def identify_chunk_concept(text: str) -> dict:
+
     prompt = f"""
 Identify the main educational concept explained in this text.
 
@@ -78,26 +82,56 @@ Source text:
         "concept": data["concept"].strip()
     }
 
+
 # -----------------------------
 # Retrieve relevant chunks
 # -----------------------------
+
 
 def retrieve_chunks(
     question,
     course_id,
     top_k=3
 ):
+    question_embedding = create_embedding(question)
 
-    question_embedding = create_embedding(
-        question
-    )
+    with Session(engine) as session:
 
-    results = collection.query(
-        query_embeddings=[question_embedding],
-        n_results=top_k,
-        where={
-            "course_id": course_id
+        distance = DocumentChunk.embedding.cosine_distance(
+            question_embedding
+        ).label("distance")
+
+        results = session.execute(
+            select(DocumentChunk, distance)
+            .where(DocumentChunk.course_id == course_id)
+            .order_by(distance)
+            .limit(top_k)
+        ).all()
+
+        documents = []
+        metadatas = []
+        distances = []
+        ids = []
+
+        for chunk, cosine_distance in results:
+            ids.append(chunk.id)
+            documents.append(chunk.content)
+
+            metadatas.append({
+                "user_id": chunk.user_id,
+                "course_id": chunk.course_id,
+                "document_id": chunk.document_id,
+                "page": chunk.page,
+                "content_hash": chunk.content_hash,
+                "topic": chunk.topic,
+                "concept": chunk.concept
+            })
+
+            distances.append(float(cosine_distance))
+
+        return {
+            "ids": [ids],
+            "documents": [documents],
+            "metadatas": [metadatas],
+            "distances": [distances]
         }
-    )
-
-    return results

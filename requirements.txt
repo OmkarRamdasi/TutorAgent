@@ -1,10 +1,10 @@
 fastapi
 uvicorn[standard]
 google-genai
-chromadb
 pymupdf
 python-dotenv
 sqlalchemy
 psycopg[binary]
 firebase-admin
 python-multipart
+pgvector

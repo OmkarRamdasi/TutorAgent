@@ -25,3 +25,22 @@ dist/
 # IDE
 .vscode/
 .idea/
+
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets
+firebase-service-account.json
+*service-account*.json
+
+# Database and uploaded files
+chroma_db/
+data/uploads/
+progress.json
+
+# Firebase generated cache
+.firebase/

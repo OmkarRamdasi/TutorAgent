@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 
 from database import Base
+from pgvector.sqlalchemy import Vector
 
 
 class User(Base):
@@ -185,3 +186,47 @@ class PracticeQuestion(Base):
     )
 
     answered_at = Column(DateTime, nullable=True)
+    
+    
+    
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+
+    id = Column(String, primary_key=True)
+
+    user_id = Column(
+        String,
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True
+    )
+
+    course_id = Column(
+        String,
+        ForeignKey("courses.id"),
+        nullable=False,
+        index=True
+    )
+
+    document_id = Column(
+        String,
+        ForeignKey("documents.id"),
+        nullable=False,
+        index=True
+    )
+
+    page = Column(Integer, nullable=False)
+
+    content = Column(Text, nullable=False)
+
+    embedding = Column(Vector(3072), nullable=False)
+
+    content_hash = Column(String(64), nullable=False)
+
+    topic = Column(String)
+    concept = Column(String)
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
