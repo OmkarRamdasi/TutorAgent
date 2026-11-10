@@ -86,7 +86,7 @@ export function ProgressProvider({
           await currentUser.getIdToken();
 
         const response = await fetch(
-          `http://localhost:8000/progress/${courseId}`,
+          `${import.meta.env.VITE_API_BASE_URL}/progress/${courseId}`,
           {
             method: "GET",
             headers: {

@@ -148,7 +148,7 @@ export function TutorProvider({
         await user.getIdToken();
 
       const response = await fetch(
-        "http://localhost:8000/ask",
+        `${import.meta.env.VITE_API_BASE_URL}/ask`,
         {
           method: "POST",
 
@@ -257,7 +257,7 @@ export function TutorProvider({
       });
 
       const response = await fetch(
-        "http://localhost:8000/evaluate",
+        `${import.meta.env.VITE_API_BASE_URL}/evaluate`,
         {
           method: "POST",
           headers: {

@@ -106,7 +106,7 @@ export function PracticeProvider({
             const token = await user.getIdToken();
 
             const response = await fetch(
-                `http://localhost:8000/practice/${courseId}/history`,
+                `${import.meta.env.VITE_API_BASE_URL}/practice/${courseId}/history`,
                 {
                     method: "GET",
                     headers: {
@@ -155,7 +155,7 @@ export function PracticeProvider({
             const token = await user.getIdToken();
 
             const response = await fetch(
-                `http://localhost:8000/practice/${courseId}`,
+                `${import.meta.env.VITE_API_BASE_URL}/practice/${courseId}`,
                 {
                     method: "POST",
                     headers: {
@@ -239,7 +239,7 @@ export function PracticeProvider({
             const token = await user.getIdToken();
 
             const response = await fetch(
-                `http://localhost:8000/practice/${courseId}/question/${questionId}`,
+                `${import.meta.env.VITE_API_BASE_URL}/practice/${courseId}/question/${questionId}`,
                 {
                     method: "GET",
                     headers: {

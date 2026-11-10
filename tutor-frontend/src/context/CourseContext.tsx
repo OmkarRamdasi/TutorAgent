@@ -79,7 +79,7 @@ export function CourseProvider({ children }: CourseProviderProps) {
     try {
       const token = await currentUser.getIdToken();
 
-      const response = await fetch("http://localhost:8000/courses", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/courses`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -116,7 +116,7 @@ export function CourseProvider({ children }: CourseProviderProps) {
         const token = await currentUser.getIdToken();
 
         const response = await fetch(
-          "http://localhost:8000/summary",
+          `${import.meta.env.VITE_API_BASE_URL}/summary`,
           {
             method: "POST",
             headers: {
@@ -170,7 +170,7 @@ export function CourseProvider({ children }: CourseProviderProps) {
       formData.append("file", file);
 
       const response = await fetch(
-        "http://localhost:8000/upload",
+        `${import.meta.env.VITE_API_BASE_URL}/upload`,
         {
           method: "POST",
           headers: {
