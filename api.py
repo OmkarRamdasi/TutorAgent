@@ -33,10 +33,10 @@ from models import (
     User,
     Course,
     Document,
+    DocumentChunk,
     LearningProgress,
-    PracticeQuestion,
+    PracticeQuestion
 )
-
 
 app = FastAPI()
 
@@ -295,7 +295,9 @@ def get_courses(
 # UPLOAD PDF
 # ============================================================
 
-
+# ============================================================
+# DELETE PDF
+# ============================================================
 @app.post("/upload")
 async def upload_pdf(
     file: UploadFile = File(...),
@@ -681,6 +683,84 @@ async def upload_pdf(
         "status": "ready"
     }
 
+
+@app.delete("/courses/{course_id}")
+def delete_course(
+    course_id: str,
+    current_user=Depends(get_current_user)
+):
+    user = get_or_create_user(current_user)
+    db = SessionLocal()
+
+    try:
+        # Verify course ownership
+        course = (
+            db.query(Course)
+            .filter(
+                Course.id == course_id,
+                Course.user_id == user.id
+            )
+            .first()
+        )
+
+        if not course:
+            raise HTTPException(
+                status_code=404,
+                detail="Course not found"
+            )
+
+        # Capture uploaded file paths
+        documents = (
+            db.query(Document)
+            .filter(Document.course_id == course_id)
+            .all()
+        )
+
+        file_paths = [
+            doc.file_path for doc in documents
+            if doc.file_path
+        ]
+
+        # Delete dependent records first
+        db.query(DocumentChunk).filter(
+            DocumentChunk.course_id == course_id,
+            DocumentChunk.user_id == user.id
+        ).delete(synchronize_session=False)
+
+        db.query(PracticeQuestion).filter(
+            PracticeQuestion.course_id == course_id,
+            PracticeQuestion.user_id == user.id
+        ).delete(synchronize_session=False)
+
+        db.query(LearningProgress).filter(
+            LearningProgress.course_id == course_id,
+            LearningProgress.user_id == user.id
+        ).delete(synchronize_session=False)
+
+        db.query(Document).filter(
+            Document.course_id == course_id
+        ).delete(synchronize_session=False)
+
+        db.delete(course)
+        db.commit()
+
+        # Remove local uploaded files if they still exist
+        for file_path in file_paths:
+            path = Path(file_path)
+            if path.exists() and path.is_file():
+                path.unlink()
+
+        return {
+            "message": "Course deleted successfully",
+            "course_id": course_id
+        }
+
+    except Exception:
+        db.rollback()
+        raise
+
+    finally:
+        db.close()
 
 # ============================================================
 # ASK TUTOR
