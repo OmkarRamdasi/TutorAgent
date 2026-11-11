@@ -1,25 +1,26 @@
-from retrieve import retrieve_chunks
+from sqlalchemy import select, func
+from sqlalchemy.orm import Session
 
+from database import engine
+from models import DocumentChunk
+from models import Course, Document, DocumentChunk
+from models import Document
 
-question = "What is data preprocessing?"
+from sqlalchemy import text
+from database import engine
 
-course_id = "1c789616-f5c9-4bbe-93eb-ced3361f8919"
+with engine.connect() as connection:
+    result = connection.execute(
+        text("""
+            SELECT
+                current_database(),
+                current_schema(),
+                inet_server_addr(),
+                current_setting('server_version')
+        """)
+    ).fetchone()
 
-
-results = retrieve_chunks(
-    question,
-    course_id,
-    top_k=2
-)
-
-
-print("\nQUESTION:")
-print(question)
-
-print("\nRETRIEVED CHUNKS:\n")
-
-for i, document in enumerate(results["documents"][0]):
-
-    print(f"--- Result {i + 1} ---")
-    print(document)
-    print()
+    print("Database:", result[0])
+    print("Schema:", result[1])
+    print("Server address:", result[2])
+    print("PostgreSQL version:", result[3])

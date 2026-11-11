@@ -11,13 +11,23 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
-    # Neon PostgreSQL connection
+    DATABASE_URL = DATABASE_URL.strip()
+
+    # Use Psycopg 3 explicitly
     if DATABASE_URL.startswith("postgresql://"):
         DATABASE_URL = DATABASE_URL.replace(
             "postgresql://",
             "postgresql+psycopg://",
             1
         )
+
+    elif DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace(
+            "postgres://",
+            "postgresql+psycopg://",
+            1
+        )
+
 else:
     # Local PostgreSQL fallback
     DATABASE_PASSWORD = os.getenv("POSTGRES_PASSWORD")
@@ -40,7 +50,12 @@ engine = create_engine(
     DATABASE_URL,
     echo=False,
     pool_pre_ping=True,
-    connect_args={"connect_timeout": 10},
+    pool_size=5,
+    max_overflow=2,
+    pool_timeout=30,
+    connect_args={
+        "connect_timeout": 10,
+    },
 )
 
 SessionLocal = sessionmaker(

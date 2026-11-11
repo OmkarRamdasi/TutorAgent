@@ -8,6 +8,7 @@ import json
 
 from dotenv import load_dotenv
 from google import genai
+from requests import session
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
@@ -196,6 +197,23 @@ def ingest_pdf(pdf_path, user_id, course_id, document_id):
 
     # 3. Connect to Neon
     with Session(engine) as session:
+        from sqlalchemy import text
+
+        db_info = session.execute(
+            text("""
+                SELECT
+                    current_database(),
+                    current_schema(),
+                    inet_server_addr(),
+                    current_setting('server_version')
+                """)
+            ).fetchone()
+
+        print("DATABASE DIAGNOSTICS:")
+        print("Database:", db_info[0])
+        print("Schema:", db_info[1])
+        print("Server address:", db_info[2])
+        print("PostgreSQL version:", db_info[3])
 
         # Load existing hashes for this user
         existing_hashes = set(

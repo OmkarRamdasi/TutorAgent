@@ -607,25 +607,30 @@ def record_progress(
 # ============================================================
 
 
+
 def retrieve(
     question,
     course_id,
-    number_of_chunks=2
+    number_of_chunks=2,
+    user_id=None
 ):
     """
     Retrieve relevant course material from Neon pgvector.
-    Retrieval is restricted to the selected course.
+    Retrieval is restricted to the selected course and,
+    when supplied, the authenticated user.
     """
 
     results = retrieve_chunks(
         question=question,
         course_id=course_id,
-        top_k=number_of_chunks
+        top_k=number_of_chunks,
+        user_id=user_id
     )
 
     documents = results.get("documents", [[]])[0]
 
     return documents
+
 
 
 # ============================================================
@@ -1197,6 +1202,7 @@ def generate_practice_for_course(
         search_query,
         course_id,
         number_of_chunks=3,
+        user_id=user_id
     )
 
     if not retrieved_chunks:
@@ -1224,9 +1230,9 @@ def generate_practice_for_course(
     )
 
     mastery = (
-        concept_history["mastery"]
+        concept_history["mastery"] / 100.0
         if concept_history
-        else 0
+        else 0.0
     )
 
     learning_state = get_learning_state(mastery)
@@ -1344,7 +1350,8 @@ EVALUATION RULES
 
 def practice(
     concept,
-    course_id
+    course_id,
+    user_id
 ):
     """
     Practice a specific Data Science concept.
@@ -1601,7 +1608,8 @@ Rules:
 
 def teach(
     question,
-    course_id
+    course_id,
+    user_id
 ):
     """
     Complete RAG tutoring pipeline.
@@ -1927,7 +1935,8 @@ def ask_tutor(question, course_id, user_id):
     retrieved_chunks = retrieve(
         question,
         course_id,
-        number_of_chunks=3
+        number_of_chunks=3,
+        user_id=user_id
     )
 
     concept_identification = identify_concept(
@@ -2056,7 +2065,8 @@ def generate_practice_question(
     retrieved_chunks = retrieve(
         "Identify an important concept suitable for a practice question",
         course_id,
-        number_of_chunks=3
+        number_of_chunks=3,
+        user_id=user_id
     )
 
     if not retrieved_chunks:
@@ -2119,7 +2129,7 @@ def generate_practice_question(
 # ============================================================
 # Summary API
 # ============================================================
-def generate_course_summary(course_id):
+def generate_course_summary(course_id, user_id=None):
     """
     Generate an AI summary for a course.
     """
@@ -2129,9 +2139,10 @@ def generate_course_summary(course_id):
     # --------------------------------------------------------
 
     results = retrieve_chunks(
-        "Identify the main topics and important concepts covered in this course",
-        course_id,
-        top_k=10
+        question="Identify the main topics and important concepts covered in this course",
+        course_id=course_id,
+        top_k=10,
+        user_id=user_id
     )
 
     documents = results.get(

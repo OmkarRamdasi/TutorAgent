@@ -849,7 +849,8 @@ def generate_course_summary(
         from ask import generate_course_summary
 
         summary = generate_course_summary(
-            request.course_id
+            request.course_id,
+            user_id=user.id
         )
 
     except Exception as e:

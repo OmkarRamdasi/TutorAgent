@@ -1,4 +1,16 @@
-from sqlalchemy import Column, String, DateTime, ForeignKey, Integer, Text, Boolean
+
+from sqlalchemy import (
+    Column,
+    String,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Text,
+    Boolean,
+    UniqueConstraint,
+    CheckConstraint,
+    Index,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -26,21 +38,10 @@ class Course(Base):
     id = Column(String, primary_key=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
+    summary = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    summary = Column(
-        Text,
-        nullable=True
-    )
-
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
-
-    user = relationship(
-        "User",
-        back_populates="courses"
-    )
+    user = relationship("User", back_populates="courses")
 
     documents = relationship(
         "Document",
@@ -53,112 +54,82 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(String, primary_key=True)
-    course_id = Column(String, ForeignKey("courses.id"), nullable=False)
+    course_id = Column(
+        String,
+        ForeignKey("courses.id", ondelete="CASCADE"),
+        nullable=False
+    )
 
     filename = Column(String, nullable=False)
-    
-    file_hash = Column(
-        String(64),
-        nullable=True,
-        index=True
-    )
-    
+    file_hash = Column(String(64), nullable=True, index=True)
     pages = Column(Integer, default=0)
     chunks = Column(Integer, default=0)
     file_path = Column(String, nullable=False)
     status = Column(String, default="processing")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
-    )
+    course = relationship("Course", back_populates="documents")
 
-    course = relationship(
-        "Course",
-        back_populates="documents"
+    document_chunks = relationship(
+        "DocumentChunk",
+        back_populates="document",
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
 
 class LearningProgress(Base):
     __tablename__ = "learning_progress"
 
-    id = Column(
-        String,
-        primary_key=True
-    )
+    id = Column(String, primary_key=True)
 
-    user_id = Column(
-        String,
-        ForeignKey("users.id"),
-        nullable=False
-    )
-
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     course_id = Column(
         String,
-        ForeignKey("courses.id"),
+        ForeignKey("courses.id", ondelete="CASCADE"),
         nullable=False
     )
 
-    topic = Column(
-        String,
-        nullable=False
-    )
+    topic = Column(String, nullable=False)
+    concept = Column(String, nullable=False)
 
-    concept = Column(
-        String,
-        nullable=False
-    )
+    attempts = Column(Integer, default=0, nullable=False)
+    correct = Column(Integer, default=0, nullable=False)
+    incorrect = Column(Integer, default=0, nullable=False)
 
-    attempts = Column(
-        Integer,
-        default=0,
-        nullable=False
-    )
+    # Mastery is stored as a percentage: 0–100
+    mastery = Column(Integer, default=0, nullable=False)
 
-    correct = Column(
-        Integer,
-        default=0,
-        nullable=False
-    )
-
-    incorrect = Column(
-        Integer,
-        default=0,
-        nullable=False
-    )
-
-    mastery = Column(
-        Integer,
-        default=0,
-        nullable=False
-    )
-
-    status = Column(
-        String,
-        default="learning",
-        nullable=False
-    )
+    status = Column(String, default="not_started", nullable=False)
 
     updated_at = Column(
         DateTime,
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
-    
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "course_id",
+            "topic",
+            "concept",
+            name="uq_learning_progress_user_course_concept"
+        ),
+        CheckConstraint("mastery >= 0 AND mastery <= 100"),
+        CheckConstraint("attempts >= 0 AND correct >= 0 AND incorrect >= 0"),
+    )
+
+
 class PracticeQuestion(Base):
     __tablename__ = "practice_questions"
 
     id = Column(String, primary_key=True)
 
-    user_id = Column(
-        String,
-        ForeignKey("users.id"),
-        nullable=False
-    )
-
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     course_id = Column(
         String,
-        ForeignKey("courses.id"),
+        ForeignKey("courses.id", ondelete="CASCADE"),
         nullable=False
     )
 
@@ -171,13 +142,9 @@ class PracticeQuestion(Base):
 
     student_answer = Column(Text, nullable=True)
     evaluation_feedback = Column(Text, nullable=True)
-    is_correct = Column(Boolean, nullable=True)
 
-    status = Column(
-        String,
-        default="pending",
-        nullable=False
-    )
+    is_correct = Column(Boolean, nullable=True)
+    status = Column(String, default="pending", nullable=False)
 
     created_at = Column(
         DateTime,
@@ -186,9 +153,8 @@ class PracticeQuestion(Base):
     )
 
     answered_at = Column(DateTime, nullable=True)
-    
-    
-    
+
+
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
@@ -203,30 +169,31 @@ class DocumentChunk(Base):
 
     course_id = Column(
         String,
-        ForeignKey("courses.id"),
+        ForeignKey("courses.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
 
     document_id = Column(
         String,
-        ForeignKey("documents.id"),
+        ForeignKey("documents.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
 
     page = Column(Integer, nullable=False)
-
     content = Column(Text, nullable=False)
 
     embedding = Column(Vector(3072), nullable=False)
 
     content_hash = Column(String(64), nullable=False)
 
-    topic = Column(String)
-    concept = Column(String)
+    topic = Column(String, nullable=True)
+    concept = Column(String, nullable=True)
 
-    created_at = Column(
-        DateTime,
-        default=datetime.utcnow
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    document = relationship(
+        "Document",
+        back_populates="document_chunks"
     )

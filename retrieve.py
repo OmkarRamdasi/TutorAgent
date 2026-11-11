@@ -1,11 +1,11 @@
 
 import os
-import json
 
 from dotenv import load_dotenv
 from google import genai
+from sqlalchemy import select, cast
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from pgvector.sqlalchemy import HALFVEC
 
 from database import engine
 from models import DocumentChunk
@@ -17,9 +17,12 @@ from models import DocumentChunk
 
 load_dotenv()
 
-client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY")
-)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY is not configured")
+
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 # -----------------------------
@@ -44,66 +47,52 @@ def create_embedding(text):
 
 
 # -----------------------------
-# Identify chunk concept
-# -----------------------------
-
-def identify_chunk_concept(text: str) -> dict:
-
-    prompt = f"""
-Identify the main educational concept explained in this text.
-
-Return valid JSON with exactly these fields:
-- topic: a broad subject
-- concept: a short, specific concept name
-
-Rules:
-- Use the source text only.
-- Do not invent concepts.
-- If the text does not explain a meaningful educational concept,
-  use "General" for topic and "Unclassified content" for concept.
-- Keep the concept name concise.
-
-Source text:
-{text[:5000]}
-"""
-
-    response = client.models.generate_content(
-        model="gemini-3.8-flash",
-        contents=prompt,
-        config={
-            "response_mime_type": "application/json"
-        }
-    )
-
-    data = json.loads(response.text)
-
-    return {
-        "topic": data["topic"].strip(),
-        "concept": data["concept"].strip()
-    }
-
-
-# -----------------------------
 # Retrieve relevant chunks
 # -----------------------------
-
 
 def retrieve_chunks(
     question,
     course_id,
+    user_id,
     top_k=3
+  
 ):
+
+    if not question or not question.strip():
+        raise ValueError("Question cannot be empty")
+    
+    if not user_id or not user_id.strip():
+        raise ValueError("user_id is required for retrieval")
+    
+    if top_k < 1:
+        raise ValueError("top_k must be at least 1")
+
+
     question_embedding = create_embedding(question)
 
     with Session(engine) as session:
 
-        distance = DocumentChunk.embedding.cosine_distance(
+        # Match the halfvec HNSW index created in Neon
+        half_embedding = cast(
+            DocumentChunk.embedding,
+            HALFVEC(3072)
+        )
+
+        distance = half_embedding.cosine_distance(
             question_embedding
         ).label("distance")
 
-        results = session.execute(
+        query = (
             select(DocumentChunk, distance)
             .where(DocumentChunk.course_id == course_id)
+        )
+
+        query = query.where(
+            DocumentChunk.user_id == user_id
+        )
+
+        results = session.execute(
+            query
             .order_by(distance)
             .limit(top_k)
         ).all()
@@ -114,6 +103,7 @@ def retrieve_chunks(
         ids = []
 
         for chunk, cosine_distance in results:
+
             ids.append(chunk.id)
             documents.append(chunk.content)
 
