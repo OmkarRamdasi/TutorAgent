@@ -1,3 +1,4 @@
+
 import { Outlet, useLocation } from "react-router-dom";
 
 import { useTheme } from "../../context/ThemeContext";
@@ -16,23 +17,38 @@ export default function AuthenticatedLayout() {
 
   return (
     <div
-      className={
+      className={`flex h-dvh flex-col overflow-hidden ${
         darkMode
-          ? "flex h-screen flex-col overflow-hidden bg-zinc-950 text-white transition-colors duration-300"
-          : "flex h-screen flex-col overflow-hidden bg-(--learnai-bg) text-(--learnai-primary) transition-colors duration-300"
-      }
+          ? "bg-zinc-950 text-white"
+          : "bg-(--learnai-bg) text-(--learnai-primary)"
+      } transition-colors duration-300`}
     >
-      <Header />
+      {/* Application header */}
+      <div className="shrink-0">
+        <Header />
+      </div>
 
-      <div className="flex min-h-0 flex-1 items-stretch overflow-hidden">
-        <div className="flex shrink-0 self-stretch">
+      {/* Main application area */}
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+
+        {/* Desktop sidebar */}
+        <div className="hidden shrink-0 self-stretch md:flex">
           {isCourseWorkspace ? <CourseSidebar /> : <Sidebar />}
         </div>
 
-        <main className={`min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain ${darkMode ? "scrollbar-dark" : "scrollbar-light"
-          }`}>
+        {/* Page content */}
+        <main
+          className={`min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain ${
+            isCourseWorkspace ? "pb-20 md:pb-0" : ""
+          } ${
+            darkMode ? "scrollbar-dark" : "scrollbar-light"
+          }`}
+        >
           <Outlet />
         </main>
+
+        {/* Mobile course navigation */}
+        {isCourseWorkspace && <CourseSidebar />}
       </div>
     </div>
   );
